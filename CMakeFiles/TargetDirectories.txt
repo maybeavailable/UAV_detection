@@ -1,0 +1,3 @@
+/home/huangquan/code/UAV_detection/CMakeFiles/uav_detection.dir
+/home/huangquan/code/UAV_detection/CMakeFiles/edit_cache.dir
+/home/huangquan/code/UAV_detection/CMakeFiles/rebuild_cache.dir

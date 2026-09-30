@@ -24,7 +24,7 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 list(APPEND CMAKE_FIND_ROOT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/third_party/boost)
 list(APPEND CMAKE_FIND_ROOT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/third_party/openssl)
 
-find_package(Boost 1.88 REQUIRED COMPONENTS thread filesystem)
+find_package(Boost 1.88 REQUIRED COMPONENTS thread filesystem system)
 find_package(OpenSSL REQUIRED)
 
 
@@ -37,6 +37,10 @@ set(UAV_SOURCES
   src/main.cpp
   src/log/log.cpp
   src/log/RotateFileWriter.cpp
+  src/rtsp/rtspserver.cpp
+  src/rtsp/rtp_source.cpp
+  src/rtsp/rtp_transport.cpp
+  src/rtsp/file_source.cpp
 )
 
 add_executable(uav_detection
@@ -48,6 +52,7 @@ target_include_directories(uav_detection PRIVATE src)
 target_link_libraries(uav_detection PRIVATE
   Boost::headers                 # header-only（asio/beast/json…）
   Boost::thread
+  Boost::system
   OpenSSL::SSL OpenSSL::Crypto)
 # 日志模块已改用 std::filesystem（C++17 标准库），不再需要 Boost::filesystem；
 # 其他模块若要使用 Boost.Filesystem，在此处加回 Boost::filesystem 即可。
