@@ -10,6 +10,8 @@ set(CMAKE_MAKEFILE_DEPENDS
   "CMakeFiles/3.22.1/CMakeCXXCompiler.cmake"
   "CMakeFiles/3.22.1/CMakeSystem.cmake"
   "CMakeLists.txt"
+  "cmake/FindAscend.cmake"
+  "cmake/toolchain-ascend-aarch64.cmake"
   "third_party/boost/lib/cmake/Boost-1.88.0/BoostConfig.cmake"
   "third_party/boost/lib/cmake/Boost-1.88.0/BoostConfigVersion.cmake"
   "third_party/boost/lib/cmake/BoostDetectToolset-1.88.0.cmake"

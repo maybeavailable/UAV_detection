@@ -73,99 +73,99 @@ CMakeFiles/uav_detection.dir/src/main.cpp.o: CMakeFiles/uav_detection.dir/flags.
 CMakeFiles/uav_detection.dir/src/main.cpp.o: src/main.cpp
 CMakeFiles/uav_detection.dir/src/main.cpp.o: CMakeFiles/uav_detection.dir/compiler_depend.ts
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/huangquan/code/UAV_detection/CMakeFiles --progress-num=$(CMAKE_PROGRESS_1) "Building CXX object CMakeFiles/uav_detection.dir/src/main.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/uav_detection.dir/src/main.cpp.o -MF CMakeFiles/uav_detection.dir/src/main.cpp.o.d -o CMakeFiles/uav_detection.dir/src/main.cpp.o -c /home/huangquan/code/UAV_detection/src/main.cpp
+	/usr/bin/aarch64-linux-gnu-g++-11 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/uav_detection.dir/src/main.cpp.o -MF CMakeFiles/uav_detection.dir/src/main.cpp.o.d -o CMakeFiles/uav_detection.dir/src/main.cpp.o -c /home/huangquan/code/UAV_detection/src/main.cpp
 
 CMakeFiles/uav_detection.dir/src/main.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/uav_detection.dir/src/main.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/huangquan/code/UAV_detection/src/main.cpp > CMakeFiles/uav_detection.dir/src/main.cpp.i
+	/usr/bin/aarch64-linux-gnu-g++-11 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/huangquan/code/UAV_detection/src/main.cpp > CMakeFiles/uav_detection.dir/src/main.cpp.i
 
 CMakeFiles/uav_detection.dir/src/main.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/uav_detection.dir/src/main.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/huangquan/code/UAV_detection/src/main.cpp -o CMakeFiles/uav_detection.dir/src/main.cpp.s
+	/usr/bin/aarch64-linux-gnu-g++-11 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/huangquan/code/UAV_detection/src/main.cpp -o CMakeFiles/uav_detection.dir/src/main.cpp.s
 
 CMakeFiles/uav_detection.dir/src/log/log.cpp.o: CMakeFiles/uav_detection.dir/flags.make
 CMakeFiles/uav_detection.dir/src/log/log.cpp.o: src/log/log.cpp
 CMakeFiles/uav_detection.dir/src/log/log.cpp.o: CMakeFiles/uav_detection.dir/compiler_depend.ts
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/huangquan/code/UAV_detection/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Building CXX object CMakeFiles/uav_detection.dir/src/log/log.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/uav_detection.dir/src/log/log.cpp.o -MF CMakeFiles/uav_detection.dir/src/log/log.cpp.o.d -o CMakeFiles/uav_detection.dir/src/log/log.cpp.o -c /home/huangquan/code/UAV_detection/src/log/log.cpp
+	/usr/bin/aarch64-linux-gnu-g++-11 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/uav_detection.dir/src/log/log.cpp.o -MF CMakeFiles/uav_detection.dir/src/log/log.cpp.o.d -o CMakeFiles/uav_detection.dir/src/log/log.cpp.o -c /home/huangquan/code/UAV_detection/src/log/log.cpp
 
 CMakeFiles/uav_detection.dir/src/log/log.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/uav_detection.dir/src/log/log.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/huangquan/code/UAV_detection/src/log/log.cpp > CMakeFiles/uav_detection.dir/src/log/log.cpp.i
+	/usr/bin/aarch64-linux-gnu-g++-11 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/huangquan/code/UAV_detection/src/log/log.cpp > CMakeFiles/uav_detection.dir/src/log/log.cpp.i
 
 CMakeFiles/uav_detection.dir/src/log/log.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/uav_detection.dir/src/log/log.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/huangquan/code/UAV_detection/src/log/log.cpp -o CMakeFiles/uav_detection.dir/src/log/log.cpp.s
+	/usr/bin/aarch64-linux-gnu-g++-11 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/huangquan/code/UAV_detection/src/log/log.cpp -o CMakeFiles/uav_detection.dir/src/log/log.cpp.s
 
 CMakeFiles/uav_detection.dir/src/log/RotateFileWriter.cpp.o: CMakeFiles/uav_detection.dir/flags.make
 CMakeFiles/uav_detection.dir/src/log/RotateFileWriter.cpp.o: src/log/RotateFileWriter.cpp
 CMakeFiles/uav_detection.dir/src/log/RotateFileWriter.cpp.o: CMakeFiles/uav_detection.dir/compiler_depend.ts
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/huangquan/code/UAV_detection/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/uav_detection.dir/src/log/RotateFileWriter.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/uav_detection.dir/src/log/RotateFileWriter.cpp.o -MF CMakeFiles/uav_detection.dir/src/log/RotateFileWriter.cpp.o.d -o CMakeFiles/uav_detection.dir/src/log/RotateFileWriter.cpp.o -c /home/huangquan/code/UAV_detection/src/log/RotateFileWriter.cpp
+	/usr/bin/aarch64-linux-gnu-g++-11 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/uav_detection.dir/src/log/RotateFileWriter.cpp.o -MF CMakeFiles/uav_detection.dir/src/log/RotateFileWriter.cpp.o.d -o CMakeFiles/uav_detection.dir/src/log/RotateFileWriter.cpp.o -c /home/huangquan/code/UAV_detection/src/log/RotateFileWriter.cpp
 
 CMakeFiles/uav_detection.dir/src/log/RotateFileWriter.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/uav_detection.dir/src/log/RotateFileWriter.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/huangquan/code/UAV_detection/src/log/RotateFileWriter.cpp > CMakeFiles/uav_detection.dir/src/log/RotateFileWriter.cpp.i
+	/usr/bin/aarch64-linux-gnu-g++-11 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/huangquan/code/UAV_detection/src/log/RotateFileWriter.cpp > CMakeFiles/uav_detection.dir/src/log/RotateFileWriter.cpp.i
 
 CMakeFiles/uav_detection.dir/src/log/RotateFileWriter.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/uav_detection.dir/src/log/RotateFileWriter.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/huangquan/code/UAV_detection/src/log/RotateFileWriter.cpp -o CMakeFiles/uav_detection.dir/src/log/RotateFileWriter.cpp.s
+	/usr/bin/aarch64-linux-gnu-g++-11 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/huangquan/code/UAV_detection/src/log/RotateFileWriter.cpp -o CMakeFiles/uav_detection.dir/src/log/RotateFileWriter.cpp.s
 
 CMakeFiles/uav_detection.dir/src/rtsp/rtspserver.cpp.o: CMakeFiles/uav_detection.dir/flags.make
 CMakeFiles/uav_detection.dir/src/rtsp/rtspserver.cpp.o: src/rtsp/rtspserver.cpp
 CMakeFiles/uav_detection.dir/src/rtsp/rtspserver.cpp.o: CMakeFiles/uav_detection.dir/compiler_depend.ts
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/huangquan/code/UAV_detection/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/uav_detection.dir/src/rtsp/rtspserver.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/uav_detection.dir/src/rtsp/rtspserver.cpp.o -MF CMakeFiles/uav_detection.dir/src/rtsp/rtspserver.cpp.o.d -o CMakeFiles/uav_detection.dir/src/rtsp/rtspserver.cpp.o -c /home/huangquan/code/UAV_detection/src/rtsp/rtspserver.cpp
+	/usr/bin/aarch64-linux-gnu-g++-11 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/uav_detection.dir/src/rtsp/rtspserver.cpp.o -MF CMakeFiles/uav_detection.dir/src/rtsp/rtspserver.cpp.o.d -o CMakeFiles/uav_detection.dir/src/rtsp/rtspserver.cpp.o -c /home/huangquan/code/UAV_detection/src/rtsp/rtspserver.cpp
 
 CMakeFiles/uav_detection.dir/src/rtsp/rtspserver.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/uav_detection.dir/src/rtsp/rtspserver.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/huangquan/code/UAV_detection/src/rtsp/rtspserver.cpp > CMakeFiles/uav_detection.dir/src/rtsp/rtspserver.cpp.i
+	/usr/bin/aarch64-linux-gnu-g++-11 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/huangquan/code/UAV_detection/src/rtsp/rtspserver.cpp > CMakeFiles/uav_detection.dir/src/rtsp/rtspserver.cpp.i
 
 CMakeFiles/uav_detection.dir/src/rtsp/rtspserver.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/uav_detection.dir/src/rtsp/rtspserver.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/huangquan/code/UAV_detection/src/rtsp/rtspserver.cpp -o CMakeFiles/uav_detection.dir/src/rtsp/rtspserver.cpp.s
+	/usr/bin/aarch64-linux-gnu-g++-11 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/huangquan/code/UAV_detection/src/rtsp/rtspserver.cpp -o CMakeFiles/uav_detection.dir/src/rtsp/rtspserver.cpp.s
 
 CMakeFiles/uav_detection.dir/src/rtsp/rtp_source.cpp.o: CMakeFiles/uav_detection.dir/flags.make
 CMakeFiles/uav_detection.dir/src/rtsp/rtp_source.cpp.o: src/rtsp/rtp_source.cpp
 CMakeFiles/uav_detection.dir/src/rtsp/rtp_source.cpp.o: CMakeFiles/uav_detection.dir/compiler_depend.ts
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/huangquan/code/UAV_detection/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object CMakeFiles/uav_detection.dir/src/rtsp/rtp_source.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/uav_detection.dir/src/rtsp/rtp_source.cpp.o -MF CMakeFiles/uav_detection.dir/src/rtsp/rtp_source.cpp.o.d -o CMakeFiles/uav_detection.dir/src/rtsp/rtp_source.cpp.o -c /home/huangquan/code/UAV_detection/src/rtsp/rtp_source.cpp
+	/usr/bin/aarch64-linux-gnu-g++-11 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/uav_detection.dir/src/rtsp/rtp_source.cpp.o -MF CMakeFiles/uav_detection.dir/src/rtsp/rtp_source.cpp.o.d -o CMakeFiles/uav_detection.dir/src/rtsp/rtp_source.cpp.o -c /home/huangquan/code/UAV_detection/src/rtsp/rtp_source.cpp
 
 CMakeFiles/uav_detection.dir/src/rtsp/rtp_source.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/uav_detection.dir/src/rtsp/rtp_source.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/huangquan/code/UAV_detection/src/rtsp/rtp_source.cpp > CMakeFiles/uav_detection.dir/src/rtsp/rtp_source.cpp.i
+	/usr/bin/aarch64-linux-gnu-g++-11 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/huangquan/code/UAV_detection/src/rtsp/rtp_source.cpp > CMakeFiles/uav_detection.dir/src/rtsp/rtp_source.cpp.i
 
 CMakeFiles/uav_detection.dir/src/rtsp/rtp_source.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/uav_detection.dir/src/rtsp/rtp_source.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/huangquan/code/UAV_detection/src/rtsp/rtp_source.cpp -o CMakeFiles/uav_detection.dir/src/rtsp/rtp_source.cpp.s
+	/usr/bin/aarch64-linux-gnu-g++-11 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/huangquan/code/UAV_detection/src/rtsp/rtp_source.cpp -o CMakeFiles/uav_detection.dir/src/rtsp/rtp_source.cpp.s
 
 CMakeFiles/uav_detection.dir/src/rtsp/rtp_transport.cpp.o: CMakeFiles/uav_detection.dir/flags.make
 CMakeFiles/uav_detection.dir/src/rtsp/rtp_transport.cpp.o: src/rtsp/rtp_transport.cpp
 CMakeFiles/uav_detection.dir/src/rtsp/rtp_transport.cpp.o: CMakeFiles/uav_detection.dir/compiler_depend.ts
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/huangquan/code/UAV_detection/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object CMakeFiles/uav_detection.dir/src/rtsp/rtp_transport.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/uav_detection.dir/src/rtsp/rtp_transport.cpp.o -MF CMakeFiles/uav_detection.dir/src/rtsp/rtp_transport.cpp.o.d -o CMakeFiles/uav_detection.dir/src/rtsp/rtp_transport.cpp.o -c /home/huangquan/code/UAV_detection/src/rtsp/rtp_transport.cpp
+	/usr/bin/aarch64-linux-gnu-g++-11 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/uav_detection.dir/src/rtsp/rtp_transport.cpp.o -MF CMakeFiles/uav_detection.dir/src/rtsp/rtp_transport.cpp.o.d -o CMakeFiles/uav_detection.dir/src/rtsp/rtp_transport.cpp.o -c /home/huangquan/code/UAV_detection/src/rtsp/rtp_transport.cpp
 
 CMakeFiles/uav_detection.dir/src/rtsp/rtp_transport.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/uav_detection.dir/src/rtsp/rtp_transport.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/huangquan/code/UAV_detection/src/rtsp/rtp_transport.cpp > CMakeFiles/uav_detection.dir/src/rtsp/rtp_transport.cpp.i
+	/usr/bin/aarch64-linux-gnu-g++-11 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/huangquan/code/UAV_detection/src/rtsp/rtp_transport.cpp > CMakeFiles/uav_detection.dir/src/rtsp/rtp_transport.cpp.i
 
 CMakeFiles/uav_detection.dir/src/rtsp/rtp_transport.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/uav_detection.dir/src/rtsp/rtp_transport.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/huangquan/code/UAV_detection/src/rtsp/rtp_transport.cpp -o CMakeFiles/uav_detection.dir/src/rtsp/rtp_transport.cpp.s
+	/usr/bin/aarch64-linux-gnu-g++-11 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/huangquan/code/UAV_detection/src/rtsp/rtp_transport.cpp -o CMakeFiles/uav_detection.dir/src/rtsp/rtp_transport.cpp.s
 
 CMakeFiles/uav_detection.dir/src/rtsp/file_source.cpp.o: CMakeFiles/uav_detection.dir/flags.make
 CMakeFiles/uav_detection.dir/src/rtsp/file_source.cpp.o: src/rtsp/file_source.cpp
 CMakeFiles/uav_detection.dir/src/rtsp/file_source.cpp.o: CMakeFiles/uav_detection.dir/compiler_depend.ts
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --progress-dir=/home/huangquan/code/UAV_detection/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Building CXX object CMakeFiles/uav_detection.dir/src/rtsp/file_source.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/uav_detection.dir/src/rtsp/file_source.cpp.o -MF CMakeFiles/uav_detection.dir/src/rtsp/file_source.cpp.o.d -o CMakeFiles/uav_detection.dir/src/rtsp/file_source.cpp.o -c /home/huangquan/code/UAV_detection/src/rtsp/file_source.cpp
+	/usr/bin/aarch64-linux-gnu-g++-11 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/uav_detection.dir/src/rtsp/file_source.cpp.o -MF CMakeFiles/uav_detection.dir/src/rtsp/file_source.cpp.o.d -o CMakeFiles/uav_detection.dir/src/rtsp/file_source.cpp.o -c /home/huangquan/code/UAV_detection/src/rtsp/file_source.cpp
 
 CMakeFiles/uav_detection.dir/src/rtsp/file_source.cpp.i: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Preprocessing CXX source to CMakeFiles/uav_detection.dir/src/rtsp/file_source.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/huangquan/code/UAV_detection/src/rtsp/file_source.cpp > CMakeFiles/uav_detection.dir/src/rtsp/file_source.cpp.i
+	/usr/bin/aarch64-linux-gnu-g++-11 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /home/huangquan/code/UAV_detection/src/rtsp/file_source.cpp > CMakeFiles/uav_detection.dir/src/rtsp/file_source.cpp.i
 
 CMakeFiles/uav_detection.dir/src/rtsp/file_source.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green "Compiling CXX source to assembly CMakeFiles/uav_detection.dir/src/rtsp/file_source.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/huangquan/code/UAV_detection/src/rtsp/file_source.cpp -o CMakeFiles/uav_detection.dir/src/rtsp/file_source.cpp.s
+	/usr/bin/aarch64-linux-gnu-g++-11 $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /home/huangquan/code/UAV_detection/src/rtsp/file_source.cpp -o CMakeFiles/uav_detection.dir/src/rtsp/file_source.cpp.s
 
 # Object files for target uav_detection
 uav_detection_OBJECTS = \
@@ -192,6 +192,7 @@ bin/uav_detection: third_party/boost/lib/libboost_thread.a
 bin/uav_detection: third_party/boost/lib/libboost_system.a
 bin/uav_detection: third_party/openssl/lib/libssl.a
 bin/uav_detection: third_party/openssl/lib/libcrypto.a
+bin/uav_detection: /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64/libascendcl.so
 bin/uav_detection: CMakeFiles/uav_detection.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --green --bold --progress-dir=/home/huangquan/code/UAV_detection/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Linking CXX executable bin/uav_detection"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/uav_detection.dir/link.txt --verbose=$(VERBOSE)

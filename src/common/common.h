@@ -18,3 +18,9 @@ const int RTSP_PORT = 8554;
 
 const int RTSP_RTP_PORT = 5004;
 const int RTSP_RTCP_PORT = 5005;
+
+
+
+const int GB28181_RTP_PORT = 6000;
+
+const int GB28181_SIP_PORT = 5060;

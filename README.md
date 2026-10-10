@@ -16,18 +16,89 @@ src/
 ├── rtsp/          RTSP 服务器（rtspserver、rtp_source、rtp_transport、file_source）
 ├── camera/ encode/ detect/ track/ ...   待实现模块
 └── main.cpp       当前为 log 演示
-third_party/       Boost 1.88 / OpenSSL
+third_party/       Boost 1.88 / OpenSSL 3.5.9 / libxml2 2.9.13（均为 aarch64 静态库）
+cmake/             FindAscend.cmake（昇腾环境查找）、toolchain-ascend-aarch64.cmake（交叉工具链）
+CMakePresets.json  构建预设：ascend-aarch64 / native
 ```
 
 ## 构建
 
+默认使用**当前系统的昇腾（Ascend / CANN）编译环境**：CANN 提供 `acl/*.h` 与
+`libascendcl.so`。本机安装的 CANN 是 aarch64 版本
+（`/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux`），因此默认走 aarch64 交叉编译
+（`aarch64-linux-gnu-g++`），产物在昇腾板卡上运行。
+
 ```bash
-cmake .          # 已内置第三方 Boost/OpenSSL 查找路径；默认 Debug(-Wall -Wextra)
+cmake --preset ascend-aarch64                       # 昇腾 aarch64（Debug）
+cmake --build --preset ascend-aarch64
+# 产物：build/ascend-aarch64/bin/uav_detection （ARM aarch64）
+```
+
+也可以继续在源码目录内构建（工具链记录在 `CMakeCache.txt` 里，之后直接 `make` 即可）：
+
+```bash
+cmake -DCMAKE_TOOLCHAIN_FILE=cmake/toolchain-ascend-aarch64.cmake .   # Debug(-Wall -Wextra)
 make
+./bin/uav_detection            # 需在昇腾板卡上运行
+```
+
+CANN 路径查找顺序：`-DAscend_ROOT=` → `$ASCEND_HOME_PATH` → `$ASCEND_TOOLKIT_HOME`
+→ `/usr/local/Ascend/ascend-toolkit/latest` → `$HOME/Ascend/ascend-toolkit/latest`，
+架构子目录按目标架构选择（aarch64-linux / x86_64-linux）；配置时会打印实际选中
+的路径、版本与 `acl` 头文件/库位置。详见 `cmake/FindAscend.cmake`。
+
+> 目标架构与本机 CANN 架构不一致时会直接报错（例如 x86_64 宿主上不带工具链执行
+> `cmake .`），并提示改用 `--preset ascend-aarch64`，避免误编出“不含昇腾”的版本。
+> 只想在本机调试不依赖昇腾的模块时：`cmake --preset native`（即 `-DUAV_ASCEND=OFF`）。
+
+### 运行环境
+
+板卡上运行前需要让动态库能找到 CANN；编译时已写入
+`RUNPATH=<CANN>/aarch64-linux/lib64`，CANN 装在默认路径时可省略此步：
+
+```bash
+source /usr/local/Ascend/ascend-toolkit/set_env.sh   # runtime/nnrt 包为 setenv.bash
 ./bin/uav_detection
 ```
 
+> `third_party/` 里的 Boost 1.88 / OpenSSL 3.5.9 / libxml2 2.9.13 同样是 aarch64 版本，与昇腾环境一致。
+
 > 新增模块的 `.cpp` 必须显式加入 `CMakeLists.txt` 的 `UAV_SOURCES`（曾因遗漏导致整个 log 模块从未被编译）。
+
+### 第三方库（third_party/）
+
+三个库都是**交叉编译好的 aarch64 静态库**，直接随仓库提交，板端无需额外部署 `.so`：
+
+| 库 | 版本 | 目录 | CMake 用法 |
+| --- | --- | --- | --- |
+| Boost | 1.88 | `third_party/boost/{include,lib}` | `Boost::headers` / `Boost::thread` / `Boost::system` |
+| OpenSSL | 3.5.9 | `third_party/openssl/{include,lib}` | `OpenSSL::SSL` / `OpenSSL::Crypto` |
+| libxml2 | 2.9.13 | `third_party/libxml2/{include,lib}` | `LibXml2::LibXml2`（`#include <libxml/parser.h>`） |
+
+引入方式统一在 `CMakeLists.txt` 顶部：先把库目录追加进 `CMAKE_FIND_ROOT_PATH`，再
+`find_package(...)`，配置时会打印实际选中的版本、头文件与静态库路径。libxml2 有两处要额外注意：
+
+- CMake 自带的 `FindLibXml2` 会先读 pkg-config 的提示路径，交叉编译时容易命中宿主机的
+  x86_64 版本（头文件与库架构不一致），必须把 `third_party` 顶到搜索顺序最前面；
+- 交叉工具链把 `CMAKE_FIND_ROOT_PATH_MODE_*` 设成了 `ONLY`，只有 root path 下的路径会被搜索，
+  所以前缀必须作为 root path 追加——只设 `LibXml2_ROOT` 会直接报 `Could NOT find LibXml2`。
+
+重建 / 升级 libxml2（其余两个库同理，改脚本里的版本号即可）：
+
+```bash
+./third_party/libxml2/build-aarch64.sh      # 下载源码 → aarch64 静态编译 → 覆盖 third_party/libxml2
+```
+
+脚本里的关键选项：`--disable-shared --enable-static`（只出静态库）、`--without-zlib --without-lzma`
+（明文 XML 不需要压缩支持，省掉 `-lz`/`-llzma` 依赖）、保留 iconv（glibc 自带，GB2312 等
+非 UTF-8 报文的编码转换要用）。libxml2 静态库内部依赖 `-lm`（上游 `.pc` 的 `Libs.private: -lm`），
+CMake 3.22 的 `FindLibXml2` 不会自动带上，已在 `CMakeLists.txt` 里挂到 `LibXml2::LibXml2`
+的 `INTERFACE_LINK_LIBRARIES` 上，使用方直接链接该 target 即可。
+
+> 注意：`third_party` 里只有 aarch64 版本，`--preset native`（x86_64）能配置、能编译，
+> 但一旦真正调用这些库（Boost 的部分组件、libxml2 的任意符号）就会链接失败。libxml2 留了
+> 一个开关，本机调试需要真正跑 XML 时切到系统自带的 x86_64 版本：
+> `cmake --preset native -DLibXml2_ROOT=/usr`。
 
 ## log 模块
 

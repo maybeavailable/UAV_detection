@@ -1,0 +1,418 @@
+[2026-10-10 14:48:58.891] [INFO ] [tid:27978] [xmlpacket.cpp:686] --------------test sys_param->channel_size: 2
+
+[2026-10-10 14:48:58.892] [INFO ] [tid:27978] [xmlpacket.cpp:736] ------>catalog xml_len = 1323-----------
+
+[2026-10-10 14:48:58.892] [INFO ] [tid:27978] [xmlpacket.cpp:787] ------>keepalive xml_len = 154-----------
+
+[2026-10-10 14:48:58.892] [INFO ] [tid:27978] [xmlpacket.cpp:852] ------>deviceinfo xml_len = 425-----------
+
+[2026-10-10 14:48:58.892] [INFO ] [tid:27978] [xmlpacket.cpp:904] ------>deviceconfig xml_len = 161-----------
+
+[2026-10-10 14:48:58.892] [INFO ] [tid:27978] [xmlpacket.cpp:958] ------>device_config_ack xml_len = 161-----------
+
+[2026-10-10 14:48:58.892] [INFO ] [tid:27978] [xmlpacket.cpp:958] ------>device_config_ack xml_len = 164-----------
+
+[2026-10-10 14:48:58.892] [INFO ] [tid:27978] [xmlpacket.cpp:1015] ------>broadcast_ack xml_len = 158-----------
+
+[2026-10-10 14:48:58.892] [INFO ] [tid:27978] [xmlpacket.cpp:174] ------>devicestatus xml_len = 559-----------
+
+[2026-10-10 14:48:58.892] [INFO ] [tid:27978] [xmlpacket.cpp:228] ------>recordinfo xml_len = 772-----------
+
+[2026-10-10 14:48:58.892] [INFO ] [tid:27978] [xmlpacket.cpp:258] ------>configdownload xml_len = 210-----------
+
+[2026-10-10 14:48:58.892] [INFO ] [tid:27978] [xmlpacket.cpp:309] ------>presetquery xml_len = 525-----------
+
+[2026-10-10 14:48:58.892] [INFO ] [tid:27978] [xmlpacket.cpp:119] ------>DeviceControl ack xml_len = 162-----------
+
+[2026-10-10 14:48:58.892] [INFO ] [tid:27978] [xmlpacket.cpp:119] ------>Guard ack xml_len = 154-----------
+
+[2026-10-10 14:48:58.892] [INFO ] [tid:27978] [xmlpacket.cpp:366] ------>homeposition ack xml_len = 284-----------
+
+[2026-10-10 14:48:58.892] [INFO ] [tid:27978] [xmlpacket.cpp:119] ------>TeleBoot ack xml_len = 157-----------
+
+[2026-10-10 14:48:58.892] [INFO ] [tid:27978] [xmlpacket.cpp:119] ------>ManualRecord ack xml_len = 161-----------
+
+[2026-10-10 14:48:58.892] [INFO ] [tid:27978] [xmlpacket.cpp:410] ------>mobileposition response xml_len = 363-----------
+
+[2026-10-10 14:48:58.892] [INFO ] [tid:27978] [xmlpacket.cpp:435] ------>mobileposition notify xml_len = 337-----------
+
+[2026-10-10 14:48:58.892] [INFO ] [tid:27978] [xmlpacket.cpp:474] ------>alarm notify xml_len = 452-----------
+
+[2026-10-10 14:49:01.966] [INFO ] [tid:28014] [xmlpacket.cpp:686] --------------test sys_param->channel_size: 2
+
+[2026-10-10 14:49:01.966] [INFO ] [tid:28014] [xmlpacket.cpp:736] ------>catalog xml_len = 1323-----------
+
+[2026-10-10 14:49:01.966] [INFO ] [tid:28014] [xmlpacket.cpp:787] ------>keepalive xml_len = 154-----------
+
+[2026-10-10 14:49:01.966] [INFO ] [tid:28014] [xmlpacket.cpp:852] ------>deviceinfo xml_len = 425-----------
+
+[2026-10-10 14:49:01.966] [INFO ] [tid:28014] [xmlpacket.cpp:904] ------>deviceconfig xml_len = 161-----------
+
+[2026-10-10 14:49:01.966] [INFO ] [tid:28014] [xmlpacket.cpp:958] ------>device_config_ack xml_len = 161-----------
+
+[2026-10-10 14:49:01.966] [INFO ] [tid:28014] [xmlpacket.cpp:958] ------>device_config_ack xml_len = 164-----------
+
+[2026-10-10 14:49:01.966] [INFO ] [tid:28014] [xmlpacket.cpp:1015] ------>broadcast_ack xml_len = 158-----------
+
+[2026-10-10 14:49:01.966] [INFO ] [tid:28014] [xmlpacket.cpp:174] ------>devicestatus xml_len = 559-----------
+
+[2026-10-10 14:49:01.966] [INFO ] [tid:28014] [xmlpacket.cpp:228] ------>recordinfo xml_len = 772-----------
+
+[2026-10-10 14:49:01.966] [INFO ] [tid:28014] [xmlpacket.cpp:258] ------>configdownload xml_len = 210-----------
+
+[2026-10-10 14:49:01.966] [INFO ] [tid:28014] [xmlpacket.cpp:309] ------>presetquery xml_len = 525-----------
+
+[2026-10-10 14:49:01.966] [INFO ] [tid:28014] [xmlpacket.cpp:119] ------>DeviceControl ack xml_len = 162-----------
+
+[2026-10-10 14:49:01.966] [INFO ] [tid:28014] [xmlpacket.cpp:119] ------>Guard ack xml_len = 154-----------
+
+[2026-10-10 14:49:01.966] [INFO ] [tid:28014] [xmlpacket.cpp:366] ------>homeposition ack xml_len = 284-----------
+
+[2026-10-10 14:49:01.966] [INFO ] [tid:28014] [xmlpacket.cpp:119] ------>TeleBoot ack xml_len = 157-----------
+
+[2026-10-10 14:49:01.966] [INFO ] [tid:28014] [xmlpacket.cpp:119] ------>ManualRecord ack xml_len = 161-----------
+
+[2026-10-10 14:49:01.966] [INFO ] [tid:28014] [xmlpacket.cpp:410] ------>mobileposition response xml_len = 363-----------
+
+[2026-10-10 14:49:01.966] [INFO ] [tid:28014] [xmlpacket.cpp:435] ------>mobileposition notify xml_len = 337-----------
+
+[2026-10-10 14:49:01.966] [INFO ] [tid:28014] [xmlpacket.cpp:474] ------>alarm notify xml_len = 452-----------
+
+[2026-10-10 14:49:01.966] [INFO ] [tid:28014] [xmlpacket.cpp:499] ------>mediastatus notify xml_len = 165-----------
+
+[2026-10-10 14:49:01.966] [INFO ] [tid:28014] [xmlpacket.cpp:529] ------>upgrade ack xml_len = 199-----------
+
+[2026-10-10 14:49:01.966] [INFO ] [tid:28014] [xmlpacket.cpp:559] ------>light ack xml_len = 207-----------
+
+[2026-10-10 14:49:01.966] [INFO ] [tid:28014] [xmlpacket.cpp:595] ------>algconfig ack xml_len = 344-----------
+
+[2026-10-10 14:49:01.966] [INFO ] [tid:28014] [xmlpacket.cpp:622] ------>alarmupload ack xml_len = 284-----------
+
+[2026-10-10 14:49:01.966] [INFO ] [tid:28014] [xmlpacket.cpp:119] ------>Keepalive ack xml_len = 158-----------
+
+[2026-10-10 14:49:01.966] [WARN ] [tid:28014] [xmlpacket.cpp:660] xml_pack_catalog input null ptr!
+
+[2026-10-10 14:49:01.966] [WARN ] [tid:28014] [xmlpacket.cpp:269] xml_pack_preset_query input null ptr!
+
+[2026-10-10 14:52:52.732] [INFO ] [tid:28262] [xmlpacket.cpp:703] --------------test sys_param->channel_size: 2
+
+[2026-10-10 14:52:52.732] [INFO ] [tid:28262] [xmlpacket.cpp:754] ------>catalog xml_len = 1323-----------
+
+[2026-10-10 14:52:52.732] [INFO ] [tid:28262] [xmlpacket.cpp:805] ------>keepalive xml_len = 154-----------
+
+[2026-10-10 14:52:52.732] [INFO ] [tid:28262] [xmlpacket.cpp:870] ------>deviceinfo xml_len = 425-----------
+
+[2026-10-10 14:52:52.732] [INFO ] [tid:28262] [xmlpacket.cpp:922] ------>deviceconfig xml_len = 161-----------
+
+[2026-10-10 14:52:52.732] [INFO ] [tid:28262] [xmlpacket.cpp:971] ------>device_config_ack xml_len = 161-----------
+
+[2026-10-10 14:52:52.732] [INFO ] [tid:28262] [xmlpacket.cpp:971] ------>device_config_ack xml_len = 164-----------
+
+[2026-10-10 14:52:52.732] [INFO ] [tid:28262] [xmlpacket.cpp:1022] ------>broadcast_ack xml_len = 158-----------
+
+[2026-10-10 14:52:52.732] [INFO ] [tid:28262] [xmlpacket.cpp:191] ------>devicestatus xml_len = 559-----------
+
+[2026-10-10 14:52:52.732] [INFO ] [tid:28262] [xmlpacket.cpp:245] ------>recordinfo xml_len = 772-----------
+
+[2026-10-10 14:52:52.732] [INFO ] [tid:28262] [xmlpacket.cpp:275] ------>configdownload xml_len = 210-----------
+
+[2026-10-10 14:52:52.732] [INFO ] [tid:28262] [xmlpacket.cpp:326] ------>presetquery xml_len = 525-----------
+
+[2026-10-10 14:52:52.732] [INFO ] [tid:28262] [xmlpacket.cpp:136] ------>DeviceControl ack xml_len = 162-----------
+
+[2026-10-10 14:52:52.732] [INFO ] [tid:28262] [xmlpacket.cpp:136] ------>Guard ack xml_len = 154-----------
+
+[2026-10-10 14:52:52.732] [INFO ] [tid:28262] [xmlpacket.cpp:383] ------>homeposition ack xml_len = 284-----------
+
+[2026-10-10 14:52:52.732] [INFO ] [tid:28262] [xmlpacket.cpp:136] ------>TeleBoot ack xml_len = 157-----------
+
+[2026-10-10 14:52:52.732] [INFO ] [tid:28262] [xmlpacket.cpp:136] ------>ManualRecord ack xml_len = 161-----------
+
+[2026-10-10 14:52:52.732] [INFO ] [tid:28262] [xmlpacket.cpp:427] ------>mobileposition response xml_len = 363-----------
+
+[2026-10-10 14:52:52.732] [INFO ] [tid:28262] [xmlpacket.cpp:452] ------>mobileposition notify xml_len = 337-----------
+
+[2026-10-10 14:52:52.732] [INFO ] [tid:28262] [xmlpacket.cpp:491] ------>alarm notify xml_len = 606-----------
+
+[2026-10-10 14:52:52.732] [INFO ] [tid:28262] [xmlpacket.cpp:516] ------>mediastatus notify xml_len = 165-----------
+
+[2026-10-10 14:52:52.732] [INFO ] [tid:28262] [xmlpacket.cpp:546] ------>upgrade ack xml_len = 254-----------
+
+[2026-10-10 14:52:52.732] [INFO ] [tid:28262] [xmlpacket.cpp:576] ------>light ack xml_len = 207-----------
+
+[2026-10-10 14:52:52.732] [INFO ] [tid:28262] [xmlpacket.cpp:612] ------>algconfig ack xml_len = 344-----------
+
+[2026-10-10 14:52:52.732] [INFO ] [tid:28262] [xmlpacket.cpp:639] ------>alarmupload ack xml_len = 284-----------
+
+[2026-10-10 14:52:52.732] [INFO ] [tid:28262] [xmlpacket.cpp:136] ------>Keepalive ack xml_len = 158-----------
+
+[2026-10-10 14:52:52.732] [WARN ] [tid:28262] [xmlpacket.cpp:677] xml_pack_catalog input null ptr!
+
+[2026-10-10 14:52:52.732] [WARN ] [tid:28262] [xmlpacket.cpp:286] xml_pack_preset_query input null ptr!
+
+[2026-10-10 14:53:15.166] [INFO ] [tid:28308] [xmlpacket.cpp:703] --------------test sys_param->channel_size: 2
+
+[2026-10-10 14:53:15.166] [INFO ] [tid:28308] [xmlpacket.cpp:754] ------>catalog xml_len = 1323-----------
+
+[2026-10-10 14:53:15.182] [INFO ] [tid:28308] [xmlpacket.cpp:805] ------>keepalive xml_len = 154-----------
+
+[2026-10-10 14:53:15.182] [INFO ] [tid:28308] [xmlpacket.cpp:870] ------>deviceinfo xml_len = 425-----------
+
+[2026-10-10 14:53:15.182] [INFO ] [tid:28308] [xmlpacket.cpp:922] ------>deviceconfig xml_len = 161-----------
+
+[2026-10-10 14:53:15.182] [INFO ] [tid:28308] [xmlpacket.cpp:971] ------>device_config_ack xml_len = 161-----------
+
+[2026-10-10 14:53:15.182] [INFO ] [tid:28308] [xmlpacket.cpp:971] ------>device_config_ack xml_len = 164-----------
+
+[2026-10-10 14:53:15.182] [INFO ] [tid:28308] [xmlpacket.cpp:1022] ------>broadcast_ack xml_len = 158-----------
+
+[2026-10-10 14:53:15.182] [INFO ] [tid:28308] [xmlpacket.cpp:191] ------>devicestatus xml_len = 559-----------
+
+[2026-10-10 14:53:15.182] [INFO ] [tid:28308] [xmlpacket.cpp:245] ------>recordinfo xml_len = 772-----------
+
+[2026-10-10 14:53:15.182] [INFO ] [tid:28308] [xmlpacket.cpp:275] ------>configdownload xml_len = 210-----------
+
+[2026-10-10 14:53:15.182] [INFO ] [tid:28308] [xmlpacket.cpp:326] ------>presetquery xml_len = 525-----------
+
+[2026-10-10 14:53:15.182] [INFO ] [tid:28308] [xmlpacket.cpp:136] ------>DeviceControl ack xml_len = 162-----------
+
+[2026-10-10 14:53:15.182] [INFO ] [tid:28308] [xmlpacket.cpp:136] ------>Guard ack xml_len = 154-----------
+
+[2026-10-10 14:53:15.182] [INFO ] [tid:28308] [xmlpacket.cpp:383] ------>homeposition ack xml_len = 284-----------
+
+[2026-10-10 14:53:15.182] [INFO ] [tid:28308] [xmlpacket.cpp:136] ------>TeleBoot ack xml_len = 157-----------
+
+[2026-10-10 14:53:15.182] [INFO ] [tid:28308] [xmlpacket.cpp:136] ------>ManualRecord ack xml_len = 161-----------
+
+[2026-10-10 14:53:15.182] [INFO ] [tid:28308] [xmlpacket.cpp:427] ------>mobileposition response xml_len = 363-----------
+
+[2026-10-10 14:53:15.182] [INFO ] [tid:28308] [xmlpacket.cpp:452] ------>mobileposition notify xml_len = 337-----------
+
+[2026-10-10 14:53:15.182] [INFO ] [tid:28308] [xmlpacket.cpp:491] ------>alarm notify xml_len = 606-----------
+
+[2026-10-10 14:53:15.182] [INFO ] [tid:28308] [xmlpacket.cpp:516] ------>mediastatus notify xml_len = 165-----------
+
+[2026-10-10 14:53:15.182] [INFO ] [tid:28308] [xmlpacket.cpp:546] ------>upgrade ack xml_len = 254-----------
+
+[2026-10-10 14:53:15.182] [INFO ] [tid:28308] [xmlpacket.cpp:576] ------>light ack xml_len = 207-----------
+
+[2026-10-10 14:53:15.182] [INFO ] [tid:28308] [xmlpacket.cpp:612] ------>algconfig ack xml_len = 344-----------
+
+[2026-10-10 14:53:15.182] [INFO ] [tid:28308] [xmlpacket.cpp:639] ------>alarmupload ack xml_len = 284-----------
+
+[2026-10-10 14:53:15.182] [INFO ] [tid:28308] [xmlpacket.cpp:136] ------>Keepalive ack xml_len = 158-----------
+
+[2026-10-10 14:53:15.182] [WARN ] [tid:28308] [xmlpacket.cpp:677] xml_pack_catalog input null ptr!
+
+[2026-10-10 14:53:15.182] [WARN ] [tid:28308] [xmlpacket.cpp:286] xml_pack_preset_query input null ptr!
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Query, cmd=Catalog, sn=1001
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Query, cmd=DeviceInfo, sn=1002
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Query, cmd=DeviceStatus, sn=1003
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Query, cmd=RecordInfo, sn=1004
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Query, cmd=ConfigDownload, sn=1005
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Query, cmd=PresetQuery, sn=1006
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Query, cmd=DeviceConfig, sn=1007
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Query, cmd=MobilePosition, sn=1008
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=DeviceControl, sn=2001
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=DeviceControl, sn=2001
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=DeviceControl, sn=2001
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=DeviceControl, sn=2001
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=DeviceControl, sn=2001
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=DeviceControl, sn=2001
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=DeviceControl, sn=2001
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=DeviceControl, sn=2001
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=DeviceControl, sn=2001
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=DeviceControl, sn=2001
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=DeviceControl, sn=2001
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=DeviceControl, sn=2001
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=DeviceControl, sn=2001
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=DeviceControl, sn=2001
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=DeviceControl, sn=2001
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=DeviceControl, sn=2001
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=Guard, sn=2002
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=Guard, sn=2003
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=HomePosition, sn=2004
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=TeleBoot, sn=2005
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=ManualRecord, sn=2006
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=Broadcast, sn=2007
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Response, cmd=Alarm, sn=3001
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Response, cmd=Alarm, sn=3002
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=Upgrade, sn=4001
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=LightControl, sn=4002
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=AlgConfig, sn=4003
+
+[2026-10-10 15:22:25.455] [INFO ] [tid:29164] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=AlarmUpload, sn=4004
+
+[2026-10-10 15:22:25.455] [WARN ] [tid:29164] [xmlpacketparser.cpp:377] xml_packet_parse xmlReadMemory failed!
+
+[2026-10-10 15:22:25.455] [WARN ] [tid:29164] [xmlpacketparser.cpp:407] xml_packet_parse unknown root: Unknown
+
+[2026-10-10 15:22:25.455] [WARN ] [tid:29164] [xmlpacketparser.cpp:364] xml_packet_parse input null ptr!
+
+[2026-10-10 16:01:42.156] [INFO ] [tid:49354] [gb28181_media.cpp:149] GB28181 媒体通道登记: 1 路
+
+[2026-10-10 16:01:42.156] [INFO ] [tid:49354] [sipsession.cpp:80] SipSession::init 成功, 本地端口=15061, 传输=UDP, 平台=127.0.0.1:15060
+
+[2026-10-10 16:01:42.156] [INFO ] [tid:49358] [sipsession.cpp:398] 已发起 SIP 注册: from=sip:34020000001320000001@3402000000, to=sip:34020000002000000001@127.0.0.1:15060, expires=3600
+
+[2026-10-10 16:01:42.157] [WARN ] [tid:49358] [sipsession.cpp:212] SIP 注册失败(将自动重试), rid=1
+
+[2026-10-10 16:01:42.158] [INFO ] [tid:49358] [sipsession.cpp:206] SIP 注册成功, rid=1
+
+[2026-10-10 16:01:42.257] [INFO ] [tid:49358] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=DeviceControl, sn=2001
+
+[2026-10-10 16:01:42.257] [INFO ] [tid:49358] [sipsession.cpp:306] 平台指令: cmd=DeviceControl, sn=2001, device=34020000001320000001
+
+[2026-10-10 16:01:42.257] [INFO ] [tid:49358] [xmlpacket.cpp:136] ------>DeviceControl ack xml_len = 162-----------
+
+[2026-10-10 16:01:43.260] [INFO ] [tid:49358] [xmlpacket.cpp:805] ------>keepalive xml_len = 151-----------
+
+[2026-10-10 16:01:43.360] [INFO ] [tid:49358] [sipsession.cpp:363] 已应答 INVITE(200 OK), did=2, 通道=34020000001320000002, 媒体端口=17000, 平台SDP长度=179
+
+[2026-10-10 16:01:43.461] [WARN ] [tid:49358] [ps_rtp_pusher.cpp:117] PsRtpPusher::open bind 17000 失败: Address already in use
+
+[2026-10-10 16:01:43.461] [WARN ] [tid:49358] [gb28181_media.cpp:187] startSession 失败: 媒体通道打开失败, did=2
+
+[2026-10-10 16:01:43.461] [INFO ] [tid:49358] [sipsession.cpp:245] 媒体会话建立(ACK), did=2, 通道=34020000001320000002
+
+[2026-10-10 16:01:44.263] [INFO ] [tid:49358] [xmlpacket.cpp:805] ------>keepalive xml_len = 151-----------
+
+[2026-10-10 16:01:45.266] [INFO ] [tid:49358] [xmlpacket.cpp:805] ------>keepalive xml_len = 151-----------
+
+[2026-10-10 16:01:46.270] [INFO ] [tid:49358] [xmlpacket.cpp:805] ------>keepalive xml_len = 151-----------
+
+[2026-10-10 16:01:46.897] [INFO ] [tid:49358] [sipsession.cpp:197] SipSession 信令线程退出
+
+[2026-10-10 16:01:46.898] [INFO ] [tid:49354] [sipsession.cpp:420] 已发送注销请求(expires=0)
+
+[2026-10-10 16:01:51.386] [INFO ] [tid:49451] [gb28181_media.cpp:149] GB28181 媒体通道登记: 1 路
+
+[2026-10-10 16:01:51.387] [INFO ] [tid:49451] [sipsession.cpp:80] SipSession::init 成功, 本地端口=15061, 传输=UDP, 平台=127.0.0.1:15060
+
+[2026-10-10 16:01:51.387] [INFO ] [tid:49455] [sipsession.cpp:398] 已发起 SIP 注册: from=sip:34020000001320000001@3402000000, to=sip:34020000002000000001@127.0.0.1:15060, expires=3600
+
+[2026-10-10 16:01:51.387] [WARN ] [tid:49455] [sipsession.cpp:212] SIP 注册失败(将自动重试), rid=1
+
+[2026-10-10 16:01:51.388] [INFO ] [tid:49455] [sipsession.cpp:206] SIP 注册成功, rid=1
+
+[2026-10-10 16:01:51.487] [INFO ] [tid:49455] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=DeviceControl, sn=2001
+
+[2026-10-10 16:01:51.487] [INFO ] [tid:49455] [sipsession.cpp:306] 平台指令: cmd=DeviceControl, sn=2001, device=34020000001320000001
+
+[2026-10-10 16:01:51.487] [INFO ] [tid:49455] [xmlpacket.cpp:136] ------>DeviceControl ack xml_len = 162-----------
+
+[2026-10-10 16:01:52.490] [INFO ] [tid:49455] [xmlpacket.cpp:805] ------>keepalive xml_len = 151-----------
+
+[2026-10-10 16:01:52.591] [INFO ] [tid:49455] [sipsession.cpp:363] 已应答 INVITE(200 OK), did=2, 通道=34020000001320000002, 媒体端口=17000, 平台SDP长度=179
+
+[2026-10-10 16:01:52.692] [WARN ] [tid:49455] [ps_rtp_pusher.cpp:117] PsRtpPusher::open bind 17000 失败: Address already in use
+
+[2026-10-10 16:01:52.692] [WARN ] [tid:49455] [gb28181_media.cpp:187] startSession 失败: 媒体通道打开失败, did=2
+
+[2026-10-10 16:01:52.692] [INFO ] [tid:49455] [sipsession.cpp:245] 媒体会话建立(ACK), did=2, 通道=34020000001320000002
+
+[2026-10-10 16:01:53.494] [INFO ] [tid:49455] [xmlpacket.cpp:805] ------>keepalive xml_len = 151-----------
+
+[2026-10-10 16:01:54.497] [INFO ] [tid:49455] [xmlpacket.cpp:805] ------>keepalive xml_len = 151-----------
+
+[2026-10-10 16:01:55.500] [INFO ] [tid:49455] [xmlpacket.cpp:805] ------>keepalive xml_len = 151-----------
+
+[2026-10-10 16:01:56.129] [INFO ] [tid:49455] [sipsession.cpp:197] SipSession 信令线程退出
+
+[2026-10-10 16:01:56.129] [INFO ] [tid:49451] [sipsession.cpp:420] 已发送注销请求(expires=0)
+
+[2026-10-10 16:01:59.456] [INFO ] [tid:49549] [gb28181_media.cpp:149] GB28181 媒体通道登记: 1 路
+
+[2026-10-10 16:01:59.456] [INFO ] [tid:49549] [sipsession.cpp:80] SipSession::init 成功, 本地端口=15061, 传输=UDP, 平台=127.0.0.1:15060
+
+[2026-10-10 16:01:59.457] [INFO ] [tid:49553] [sipsession.cpp:398] 已发起 SIP 注册: from=sip:34020000001320000001@3402000000, to=sip:34020000002000000001@127.0.0.1:15060, expires=3600
+
+[2026-10-10 16:01:59.457] [WARN ] [tid:49553] [sipsession.cpp:212] SIP 注册失败(将自动重试), rid=1
+
+[2026-10-10 16:01:59.458] [INFO ] [tid:49553] [sipsession.cpp:206] SIP 注册成功, rid=1
+
+[2026-10-10 16:01:59.557] [INFO ] [tid:49553] [xmlpacketparser.cpp:424] ------>parse ok, root=Control, cmd=DeviceControl, sn=2001
+
+[2026-10-10 16:01:59.557] [INFO ] [tid:49553] [sipsession.cpp:306] 平台指令: cmd=DeviceControl, sn=2001, device=34020000001320000001
+
+[2026-10-10 16:01:59.557] [INFO ] [tid:49553] [xmlpacket.cpp:136] ------>DeviceControl ack xml_len = 162-----------
+
+[2026-10-10 16:02:00.560] [INFO ] [tid:49553] [xmlpacket.cpp:805] ------>keepalive xml_len = 151-----------
+
+[2026-10-10 16:02:00.661] [INFO ] [tid:49553] [sipsession.cpp:363] 已应答 INVITE(200 OK), did=2, 通道=34020000001320000002, 媒体端口=17000, 平台SDP长度=179
+
+[2026-10-10 16:02:00.761] [WARN ] [tid:49553] [ps_rtp_pusher.cpp:117] PsRtpPusher::open bind 17000 失败: Address already in use
+
+[2026-10-10 16:02:00.761] [WARN ] [tid:49553] [gb28181_media.cpp:187] startSession 失败: 媒体通道打开失败, did=2
+
+[2026-10-10 16:02:00.761] [INFO ] [tid:49553] [sipsession.cpp:245] 媒体会话建立(ACK), did=2, 通道=34020000001320000002
+
+[2026-10-10 16:02:01.563] [INFO ] [tid:49553] [xmlpacket.cpp:805] ------>keepalive xml_len = 151-----------
+
+[2026-10-10 16:02:02.567] [INFO ] [tid:49553] [xmlpacket.cpp:805] ------>keepalive xml_len = 151-----------
+
+[2026-10-10 16:02:03.570] [INFO ] [tid:49553] [xmlpacket.cpp:805] ------>keepalive xml_len = 151-----------
+
+[2026-10-10 16:02:04.204] [INFO ] [tid:49553] [sipsession.cpp:197] SipSession 信令线程退出
+
+[2026-10-10 16:02:04.204] [INFO ] [tid:49549] [sipsession.cpp:420] 已发送注销请求(expires=0)
+
+[2026-10-10 16:16:05.978] [ERROR] [tid:51935] [urt.h:99] Urt::open 打开 /dev/definitely-not-exist-urt 失败: No such file or directory
+
+[2026-10-10 16:16:05.978] [ERROR] [tid:51935] [urt.h:99] Urt::open 打开 /dev/pts/0 失败: Device or resource busy
+
+[2026-10-10 16:16:18.635] [ERROR] [tid:52065] [urt.h:99] Urt::open 打开 /dev/definitely-not-exist-urt 失败: No such file or directory
+
+[2026-10-10 16:16:18.635] [ERROR] [tid:52065] [urt.h:99] Urt::open 打开 /dev/pts/0 失败: Device or resource busy
+
+[2026-10-10 16:16:48.098] [ERROR] [tid:52241] [urt.h:103] Urt::open 打开 /dev/definitely-not-exist-urt 失败: No such file or directory
+
+[2026-10-10 16:16:48.098] [ERROR] [tid:52241] [urt.h:103] Urt::open 打开 /dev/pts/0 失败: Device or resource busy
+
+[2026-10-10 16:16:48.098] [ERROR] [tid:52241] [urt.h:103] Urt::open 打开 /dev/pts/0 失败: Device or resource busy
+
+[2026-10-10 16:16:48.098] [ERROR] [tid:52241] [urt.h:103] Urt::open 打开 /dev/pts/0 失败: No such file or directory
+
+[2026-10-10 16:17:05.006] [ERROR] [tid:52315] [urt.h:103] Urt::open 打开 /dev/definitely-not-exist-urt 失败: No such file or directory
+
+[2026-10-10 16:17:05.006] [ERROR] [tid:52315] [urt.h:103] Urt::open 打开 /dev/pts/1 失败: Device or resource busy
+
+[2026-10-10 16:17:11.851] [ERROR] [tid:52365] [urt.h:103] Urt::open 打开 /dev/definitely-not-exist-urt 失败: No such file or directory
+
+[2026-10-10 16:17:11.999] [ERROR] [tid:52365] [urt.h:103] Urt::open 打开 /dev/pts/1 失败: Device or resource busy
+
