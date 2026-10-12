@@ -1,0 +1,53 @@
+{
+  // C/C++ IntelliSense 配置（VSCode + ms-vscode.cpptools）。
+  //
+  // 关键点：cpptools 不读 CMakeLists.txt，只认编译数据库或这里的 includePath。
+  // 海思/CANN 的头文件在工程外（/usr/local/Ascend/...），默认配置搜不到，
+  // 所以 acl.h、hi_mpi_*.h 会标红波浪线。
+  //
+  // compileCommands 指向 cmake 导出的编译数据库（CMakeLists.txt 里的
+  // CMAKE_EXPORT_COMPILE_COMMANDS ON），里面每条命令都带着和真实构建完全一致的
+  // -I / -isystem，因此编译能过 = 这里不标红。
+  // 注意：它必须显式写在这里 —— 你全局 settings 里的 C_Cpp.default.compileCommands
+  // 指向 llvm-project，优先级的规则是“本文件写了就用本文件的，没写才用 ${default}”。
+  //
+  // 切换预设时改这一行即可：
+  //   build/ascend-aarch64/compile_commands.json  昇腾 aarch64（默认，海思头齐全）
+  //   build/native/compile_commands.json          本机 x86_64（UAV_ASCEND=OFF，无海思头）
+  "version": 4,
+  "configurations": [
+    {
+      "name": "UAV_detection-ascend-aarch64",
+      "compileCommands": "${workspaceFolder}/build/ascend-aarch64/compile_commands.json",
+      "compilerPath": "/usr/bin/aarch64-linux-gnu-g++-11",
+      "cStandard": "c17",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "linux-gcc-arm64",
+      // includePath 只是兜底：正常情况下上面那份编译数据库已经覆盖了这些路径，
+      // 但万一某个文件在数据库里没有条目（例如尚未加入 UAV_SOURCES 的 .cpp），
+      // 这里列出的路径仍能保证第三方头文件不标红。
+      "includePath": [
+        "${workspaceFolder}/src",
+        "${workspaceFolder}/third_party/boost/include",
+        "${workspaceFolder}/third_party/openssl/include",
+        "${workspaceFolder}/third_party/libxml2/include/libxml2",
+        "${workspaceFolder}/third_party/libeXosip2/include",
+        "${workspaceFolder}/third_party/libosip2/include",
+        "/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include",
+        "/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl",
+        "/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/dvpp",
+        "/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/media"
+      ],
+      "browse": {
+        "path": [
+          "${workspaceFolder}/src",
+          "${workspaceFolder}/third_party/boost/include",
+          "${workspaceFolder}/third_party/openssl/include",
+          "${workspaceFolder}/third_party/libxml2/include/libxml2",
+          "/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include"
+        ],
+        "limitSymbolsToIncludedHeaders": true
+      }
+    }
+  ]
+}

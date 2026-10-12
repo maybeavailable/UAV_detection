@@ -1,6 +1,9 @@
 #include"rtsp/file_source.h"
 
 #include"log/log.h"
+#include"rtsp/h264_access_unit.h"
+#include<cmath>
+#include<stdexcept>
 
 #include<chrono>
 #include<fstream>
@@ -10,14 +13,17 @@
 FileRtpSource::FileRtpSource(std::string path, std::string filePath, double fps)
     : m_path_(std::move(path)),
       m_filePath_(std::move(filePath)),
-      m_fps_(fps > 0 ? fps : 25.0)
+      m_fps_(fps)
 {
+    if (!std::isfinite(fps) || fps < 1.0e-6 || fps > 1000000)
+        throw std::invalid_argument("FileRtpSource fps must be finite and in [1e-6, 1e6]");
     m_thread_ = std::thread(&FileRtpSource::loop, this);
 }
 
 FileRtpSource::~FileRtpSource()
 {
-    m_stop_.store(true);
+    { std::lock_guard<std::mutex> lock(m_sleepMutex_); m_stop_.store(true); }
+    m_wake_.notify_all();
     if (m_thread_.joinable())
         m_thread_.join();
 }
@@ -39,8 +45,8 @@ std::string FileRtpSource::makeSdp(const std::string& host, int port) const
     sdp += "m=video 0 RTP/AVP 96\r\n";
     sdp += "b=AS:2048\r\n";
     sdp += "a=rtpmap:96 H264/90000\r\n";
-    // 不写 fmtp/spop-parameter-sets：SPS/PPS 由文件内容经 RTP 内嵌下发，
-    // 避免 SDP 里写死参数与真实码流不一致
+    // 参数集通过 RTP 内嵌下发，分片模式必须与 Single NAL/FU-A 一致。
+    sdp += "a=fmtp:96 packetization-mode=1\r\n";
     sdp += "a=control:track1\r\n";
     return sdp;
 }
@@ -62,65 +68,37 @@ void FileRtpSource::loop()
         return;
     }
 
-    const auto nals = splitAnnexB(all.data(), all.size());
-    if (nals.empty())
+    try
     {
-        UAV_LOG_ERROR << "FileRtpSource: no NAL found in: " << m_filePath_;
-        return;
-    }
-
-    // 缓存 SPS/PPS（带起启码），IDR 帧之前拼进去，保证客户端随时能解码
-    std::vector<std::uint8_t> spsPps;
-    for (const auto& nal : nals)
-    {
-        const int type = nal.data[0] & 0x1F;
-        if (type == 7 || type == 8)
+        const auto units = parseH264AccessUnits(all.data(), all.size());
+        const auto interval = std::chrono::microseconds(static_cast<long long>(1000000.0L / m_fps_));
+        auto epoch = std::chrono::steady_clock::now();
+        std::uint64_t index = 0;
+        UAV_LOG_INFO << "FileRtpSource started: path=" << m_path_
+                     << " file=" << m_filePath_ << " fps=" << m_fps_;
+        while (!m_stop_.load())
         {
-            const std::uint8_t startCode[4] = {0, 0, 0, 1};
-            spsPps.insert(spsPps.end(), startCode, startCode + 4);
-            spsPps.insert(spsPps.end(), nal.data, nal.data + nal.size);
+            for (const auto& unit : units)
+            {
+                // PTS 和发送时刻来自同一个累计时间基，非整数帧率不会按帧累积截断误差。
+                const auto pts = static_cast<std::uint64_t>(std::llround(index * 1000000.0L / m_fps_));
+                auto deadline = epoch + std::chrono::microseconds(pts);
+                const auto now = std::chrono::steady_clock::now();
+                if (now > deadline + interval * 10)
+                {
+                    epoch = now - std::chrono::microseconds(pts);
+                    deadline = now;
+                }
+                std::unique_lock<std::mutex> lock(m_sleepMutex_);
+                if (m_wake_.wait_until(lock, deadline, [this] { return m_stop_.load(); })) return;
+                lock.unlock();
+                pushFrame(unit.data.data(), unit.data.size(), pts);
+                ++index;
+            }
         }
     }
-
-    const auto frameInterval = std::chrono::microseconds(
-        static_cast<long long>(1000000.0 / m_fps_));
-    auto nextFrameTime = std::chrono::steady_clock::now();
-    std::uint64_t frameIndex = 0;
-
-    UAV_LOG_INFO << "FileRtpSource started: path=" << m_path_
-                 << " file=" << m_filePath_ << " fps=" << m_fps_;
-
-    while (!m_stop_.load())
+    catch (const std::exception& e)
     {
-        for (const auto& nal : nals)
-        {
-            if (m_stop_.load())
-                break;
-
-            const int type = nal.data[0] & 0x1F;
-            if (type != 1 && type != 5)
-                continue;                     // 只推切片；SPS/PPS/SEI 随 IDR 下发
-
-            std::vector<std::uint8_t> frame;
-            if (type == 5 && !spsPps.empty())
-                frame = spsPps;               // IDR 前缀 SPS+PPS
-            const std::uint8_t startCode[4] = {0, 0, 0, 1};
-            frame.insert(frame.end(), startCode, startCode + 4);
-            frame.insert(frame.end(), nal.data, nal.data + nal.size);
-
-            const std::uint64_t ptsUs =
-                frameIndex * 1000000u / static_cast<std::uint64_t>(m_fps_);
-            pushFrame(frame.data(), frame.size(), ptsUs);
-            ++frameIndex;
-
-            // 节流：落后太多（如中途卡顿）则重置节拍，避免追帧风暴
-            const auto now = std::chrono::steady_clock::now();
-            if (now > nextFrameTime + frameInterval * 10)
-                nextFrameTime = now;
-
-            nextFrameTime += frameInterval;
-            if (nextFrameTime > now)
-                std::this_thread::sleep_until(nextFrameTime);
-        }
+        UAV_LOG_ERROR << "FileRtpSource: " << m_filePath_ << ": " << e.what();
     }
 }

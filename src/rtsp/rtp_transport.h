@@ -7,6 +7,8 @@
 #include<atomic>
 #include<cstdint>
 #include<functional>
+#include<deque>
+#include<mutex>
 #include<memory>
 #include<vector>
 
@@ -19,6 +21,7 @@
 //
 // 线程约定：deliverRtp 可被源线程调用，内部 post 回 io_context 线程做实际 I/O；
 // handleRtcp 只在 io_context 线程被调用（UDP 收包回调 / session 解析到 $ 帧）。
+// 其余生命周期/回调设置也在同一个 io_context 线程执行，或在事件循环停止后执行。
 class RtpTransport : public std::enable_shared_from_this<RtpTransport>
 {
 public:
@@ -35,6 +38,10 @@ public:
         int          interleavedRtcp{1};                // TCP：RTCP 通道号（奇数）
         std::uint32_t ssrc{0};                          // 用源的 ssrc，SETUP 回显与包内一致
         std::string  clientAddress;                     // UDP：RTP 发送目的地（RTSP 对端 IP）
+        std::uint32_t clockRate{90000};
+        std::size_t maxPendingBytes{2 * 1024 * 1024};
+        std::size_t maxPendingPackets{4096};
+        std::chrono::milliseconds rtcpInterval{5000};
     };
 
     // TCP 模式投递回调：session 提供，把 $ 帧写进 RTSP 连接的写队列（仅在 io 线程调用）
@@ -55,6 +62,11 @@ public:
 
     bool isOpen() const { return m_open_.load(std::memory_order_relaxed); }
 
+    // 对象由 shared_ptr 管理后启动 UDP 接收，重复调用无副作用。
+    void start();
+    void setFailureCallback(std::function<void()> callback);
+    std::size_t pendingBytes() const;
+
     // 源线程调用：把 RTP 包投递到客户端
     void deliverRtp(const std::shared_ptr<const std::vector<std::uint8_t>>& packet);
 
@@ -70,6 +82,8 @@ public:
     void close();
 
 private:
+    void drainRtp();
+    void fail();
     void doDeliverRtp(const std::shared_ptr<const std::vector<std::uint8_t>>& packet);
     void startRtcpReceiveLoop();                  // UDP：收客户端 RTCP 并解析 RR
     void ensureRtcpTimer();
@@ -82,7 +96,7 @@ private:
 
     boost::asio::ip::udp::socket m_udpRtp_;
     boost::asio::ip::udp::socket m_udpRtcp_;
-    std::array<char, 2048> m_rtcpBuf_{};
+    bool m_started_{false};
 
     boost::asio::steady_timer m_rtcpTimer_;
     bool m_rtcpTimerActive_{false};
@@ -92,8 +106,17 @@ private:
     std::uint64_t m_sentPackets_{0};
     std::uint64_t m_sentOctets_{0};
     std::uint32_t m_lastRtpTimestamp_{0};
+    std::chrono::steady_clock::time_point m_lastRtpTime_{};
+
+    mutable std::mutex m_pendingMutex_;
+    std::deque<std::shared_ptr<const std::vector<std::uint8_t>>> m_pending_;
+    std::size_t m_pendingBytes_{0};
+    bool m_drainScheduled_{false};
+    bool m_overflow_{false};
+    std::function<void()> m_onFailure_;
 
     FeedbackCallback m_feedbackCallback_;
+    mutable std::mutex m_feedbackMutex_;
     RtcpFeedback     m_lastFeedback_;
     std::atomic<bool> m_hasFeedback_{false};
 };

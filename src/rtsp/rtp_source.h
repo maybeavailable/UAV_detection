@@ -4,6 +4,7 @@
 
 #include<cstdint>
 #include<memory>
+#include<optional>
 #include<vector>
 
 class RtpTransport;
@@ -35,22 +36,26 @@ public:
     virtual std::string makeSdp(const std::string& host, int port) const = 0;
 
     std::uint32_t ssrc() const { return m_ssrc_; }
+    std::uint32_t clockRate() const { return m_clockRate_; }
 
     // ---- 订阅管理（PLAY / PAUSE / TEARDOWN / 断连）----
-    void addSink(const std::shared_ptr<RtpTransport>& sink);
+    // 返回订阅后第一个 RTP 包的序号，供 PLAY 的 RTP-Info 使用。
+    std::uint16_t addSink(const std::shared_ptr<RtpTransport>& sink);
     void removeSink(const RtpTransport* sink);
 
     // ---- 推流入口：一帧 H.264（Annex-B，可含多个 NAL）----
-    // ptsUs：微秒；传 0 则按 25fps 自增
-    void pushFrame(const std::uint8_t* annexB, std::size_t size, std::uint64_t ptsUs);
+    // ptsUs：微秒，0 是有效 PTS；省略或 nullopt 时按 25fps 自增。
+    void pushFrame(const std::uint8_t* annexB, std::size_t size,
+                   std::optional<std::uint64_t> ptsUs = std::nullopt);
 
 private:
     void packetizeNal(const NalUnit& nal, std::uint32_t timestamp, bool lastNal);
     void emitPacket(std::uint32_t timestamp, bool marker,
                     const std::uint8_t* payload, std::size_t size);
     void sendToSinks(const std::shared_ptr<const std::vector<std::uint8_t>>& packet);
-    std::uint32_t nextTimestamp(std::uint64_t ptsUs);
+    std::uint32_t nextTimestamp(std::optional<std::uint64_t> ptsUs);
 
+    std::mutex m_frameMutex_; // 在完整访问单元边界订阅，序号快照与订阅原子完成
     std::mutex m_sinksMutex_;
     std::vector<std::weak_ptr<RtpTransport>> m_sinks_;
 
@@ -59,4 +64,7 @@ private:
     std::uint32_t m_ssrc_;
     std::uint16_t m_seq_;
     std::uint32_t m_timestamp_;
+    std::optional<std::uint32_t> m_ptsOrigin_;
+    std::uint32_t m_ptsBase_{0};
+    bool m_hasTimestamp_{false};
 };

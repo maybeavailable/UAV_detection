@@ -21,6 +21,7 @@ class RtspServer
 {
 public:
     explicit RtspServer(boost::asio::io_context& ioContext);
+    RtspServer(boost::asio::io_context& ioContext, unsigned short port);
     ~RtspServer();
 
     RtspServer(const RtspServer&) = delete;
@@ -36,18 +37,13 @@ public:
 
     // 开始监听 accept
     void start();
+    void stop();
+    unsigned short port() const;
 
 private:
-    void do_accept();
-
-    boost::asio::io_context& m_ioContext_;
-    boost::asio::ip::tcp::acceptor m_acceptor_;
-    // 多会话集合：新连接不再顶掉旧会话
-    std::unordered_set<std::shared_ptr<RtspSession>> m_sessions_;
-    // 路径 → 媒体源
-    std::unordered_map<std::string, std::shared_ptr<RtpSource>> m_sources_;
-    // RR 反馈回调（分发给每个会话的每个传输）
-    RtcpFeedbackCallback m_feedbackCallback_;
+    // 生命周期/注册操作在同一个 io_context 线程，或运行事件循环之前/之后执行。
+    struct State;
+    std::shared_ptr<State> m_state_;
 };
 
 class RtspSession : public std::enable_shared_from_this<RtspSession>
@@ -107,8 +103,7 @@ private:
 
     std::string header(const Request& request, const char* name) const;
     std::string local_ip() const;
-    std::string rtsp_base() const;
-    std::string rtp_info() const;
+    std::string rtsp_base(const std::string& path) const;
     bool        session_valid(const Request& request) const;
 
     boost::asio::ip::tcp::socket m_socket_;
@@ -119,6 +114,7 @@ private:
     std::size_t       m_bufOffset_{0};     // 待解析数据长度；数据始终保持在 [0, m_bufOffset_)
 
     std::deque<std::string> m_writeQueue_;
+    std::size_t m_writeBytes_{0};
     bool m_writeInProgress_{false};
     bool m_closed_{false};
     std::function<void()> m_onClose_;
@@ -126,6 +122,7 @@ private:
 
     // 握手状态
     std::string m_path_;                   // 展示路径，如 /live/uav（即媒体源注册地址）
+    std::shared_ptr<RtpSource> m_source_;   // SETUP 绑定，不随 DESCRIBE/注册表变化而改变
     std::string m_sessionId_;              // SETUP 后分配，TEARDOWN 后清空
     std::unordered_map<std::string, std::shared_ptr<RtpTransport>> m_tracks_;
     bool m_playing_{false};

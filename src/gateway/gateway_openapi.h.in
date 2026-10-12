@@ -1,0 +1,4 @@
+#pragma once
+namespace uav::gateway::detail {
+inline constexpr const char *openapi = R"UAV_OPENAPI(@GATEWAY_OPENAPI@)UAV_OPENAPI";
+}

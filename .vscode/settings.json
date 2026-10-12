@@ -1,0 +1,14 @@
+{
+  // 工作区级设置，优先级高于用户级设置（就是你全局 settings.json 里那条
+  // "C_Cpp.default.compileCommands": ".../llvm-project/build/compile_commands.json"）。
+  // 那条全局设置会把所有工程都指到 llvm-project 的编译数据库，本工程因此拿不到
+  // 任何海思/CANN 的 include 路径 —— 在 llvm-project 自己的 .vscode/settings.json
+  // 里写更合适，全局那条建议删掉。这里先在本工程内覆盖掉。
+  "C_Cpp.default.compileCommands": "${workspaceFolder}/build/ascend-aarch64/compile_commands.json",
+  "C_Cpp.default.cppStandard": "c++17",
+  "C_Cpp.default.intelliSenseMode": "linux-gcc-arm64",
+  // 文件不在 compile_commands.json 里时（头文件配对失败等），至少让工程目录可检索
+  "C_Cpp.default.includePath": [
+    "${workspaceFolder}/src"
+  ]
+}

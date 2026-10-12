@@ -1156,4 +1156,45 @@ CMakeFiles/uav_detection.dir/src/main.cpp.o: \
  /usr/aarch64-linux-gnu/include/c++/11/aarch64-linux-gnu/bits/basic_file.h \
  /usr/aarch64-linux-gnu/include/c++/11/aarch64-linux-gnu/bits/c++io.h \
  /usr/aarch64-linux-gnu/include/c++/11/bits/fstream.tcc \
- /home/huangquan/code/UAV_detection/src/common/single.h
+ /home/huangquan/code/UAV_detection/src/common/single.h \
+ /home/huangquan/code/UAV_detection/src/camera/rgb_camera_ctl.h \
+ /home/huangquan/code/UAV_detection/src/camera/rgb_camera.h \
+ /home/huangquan/code/UAV_detection/src/camera/shihui_protocol.h \
+ /home/huangquan/code/UAV_detection/src/common/urt.h \
+ /home/huangquan/code/UAV_detection/src/camera/mipi_ctl.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/acl.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/acl_rt.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/acl_base.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/error_codes/rt_error_codes.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/error_codes/ge_error_codes.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/acl_op.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/acl_mdl.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/dvpp/hi_mpi_sys.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/dvpp/hi_media_common.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/dvpp/hi_media_type.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/dvpp/hi_dvpp.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/dvpp/hi_dvpp_sys.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/dvpp/hi_mpi_sys.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/dvpp/hi_dvpp_vb.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/dvpp/hi_dvpp_common.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/dvpp/hi_dvpp_vdec.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/dvpp/hi_dvpp_venc.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/dvpp/hi_dvpp_vpc.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/dvpp/hi_dvpp_pngd.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/dvpp/hi_region.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/dvpp/hi_dvpp_venc.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/media/hi_mpi_vpss.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/media/hi_common_vpss.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/dvpp/hi_media_type.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/dvpp/hi_media_common.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/media/hi_common_sns.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/media/hi_common_isp.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/media/hi_common_vi.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/media/hi_common_gdc.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/media/hi_common_dis.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/media/hi_mpi_vo.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/media/hi_common_vo.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/media/hi_mpi_hdmi.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/dvpp/hi_region.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/media/hi_mpi_vi.h \
+ /usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/media/hi_mipi_rx.h

@@ -103,7 +103,7 @@ bool parseTransportHeader(const std::string& transport, RtpTransport::Config& co
             return false;
         int rtp = -1, rtcp = -1;
         if (std::sscanf(t.c_str() + p, "interleaved=%d-%d", &rtp, &rtcp) != 2 ||
-            rtp < 0 || rtcp < rtp)
+            rtp < 0 || rtp > 255 || rtcp < 0 || rtcp > 255 || rtcp == rtp)
         {
             return false;
         }
@@ -137,6 +137,8 @@ bool parseTransportHeader(const std::string& transport, RtpTransport::Config& co
             return false;
         }
 
+        if (rtp == 0 || rtp > 65535 || rtcp == 0 || rtcp > 65535 || rtp == rtcp)
+            return false;
         config.clientRtp  = rtp;
         config.clientRtcp = rtcp;
         return true;
@@ -149,85 +151,111 @@ bool parseTransportHeader(const std::string& transport, RtpTransport::Config& co
 
 // =============================== RtspServer ===============================
 
-RtspServer::RtspServer(boost::asio::io_context& ioContext)
-    : m_ioContext_(ioContext),
-      m_acceptor_(m_ioContext_,
-                  boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), RTSP_PORT))
+struct RtspServer::State : std::enable_shared_from_this<RtspServer::State>
 {
-    start();
-}
+    boost::asio::io_context& io;
+    boost::asio::ip::tcp::acceptor acceptor;
+    std::unordered_set<std::shared_ptr<RtspSession>> sessions;
+    std::unordered_map<std::string, std::shared_ptr<RtpSource>> sources;
+    RtcpFeedbackCallback feedback;
+    bool started{false};
+    bool stopped{false};
 
-RtspServer::~RtspServer()
-{
-    boost::system::error_code ec;
-    m_acceptor_.close(ec);
-    for (auto& session : m_sessions_)
+    State(boost::asio::io_context& context, unsigned short port)
+        : io(context), acceptor(io, {boost::asio::ip::tcp::v4(), port}) {}
+
+    std::shared_ptr<RtpSource> find(const std::string& path) const
     {
-        session->setCloseCallback(nullptr);   // 防止回调再触碰已析构的集合
-        session->close();
+        const auto it = sources.find(path);
+        return it == sources.end() ? nullptr : it->second;
     }
-    m_sessions_.clear();
-}
 
-void RtspServer::start()
-{
-    do_accept();
-}
-
-void RtspServer::registerSource(const std::shared_ptr<RtpSource>& source)
-{
-    if (!source || source->path().empty())
-        return;
-    m_sources_[source->path()] = source;
-    UAV_LOG_INFO << "RTSP source registered: " << source->path();
-}
-
-std::shared_ptr<RtpSource> RtspServer::findSource(const std::string& path) const
-{
-    const auto it = m_sources_.find(path);
-    return it == m_sources_.end() ? nullptr : it->second;
-}
-
-void RtspServer::setFeedbackCallback(RtcpFeedbackCallback callback)
-{
-    m_feedbackCallback_ = std::move(callback);
-    for (const auto& session : m_sessions_)
-        session->setFeedbackCallback(m_feedbackCallback_);
-}
-
-void RtspServer::do_accept()
-{
-    m_acceptor_.async_accept(
-        [this](boost::system::error_code ec, boost::asio::ip::tcp::socket socket)
+    void stop()
+    {
+        if (stopped) return;
+        stopped = true;
+        boost::system::error_code ec;
+        acceptor.close(ec);
+        auto closing = std::move(sessions);
+        for (const auto& session : closing)
         {
+            session->setCloseCallback(nullptr);
+            session->close();
+        }
+    }
+
+    void accept()
+    {
+        acceptor.async_accept([weak = weak_from_this()](boost::system::error_code ec,
+                                                       boost::asio::ip::tcp::socket socket) {
+            const auto state = weak.lock();
+            if (!state || state->stopped) return;
             if (ec)
             {
                 UAV_LOG_WARN << "RTSP accept failed: " << ec.message();
                 return;
             }
-
-            boost::system::error_code epEc;
-            const auto remote = socket.remote_endpoint(epEc);
-            UAV_LOG_INFO << "RTSP client connected: "
-                         << (epEc ? std::string("unknown")
-                                  : remote.address().to_string() + ":" +
-                                        std::to_string(remote.port()));
-
-            auto session = std::make_shared<RtspSession>(std::move(socket), m_ioContext_,
-                [this](const std::string& path) { return findSource(path); });
-            m_sessions_.insert(session);
-
-            // 只存 weak_ptr：避免"会话持有回调、回调持有会话"的引用环
-            std::weak_ptr<RtspSession> weak = session;
-            session->setCloseCallback([this, weak] {
-                if (const auto s = weak.lock())
-                    m_sessions_.erase(s);
+            auto session = std::make_shared<RtspSession>(std::move(socket), state->io,
+                [weak](const std::string& path) {
+                    const auto owner = weak.lock();
+                    return owner ? owner->find(path) : nullptr;
+                });
+            state->sessions.insert(session);
+            session->setCloseCallback([weak, client = std::weak_ptr<RtspSession>(session)] {
+                if (const auto owner = weak.lock())
+                    if (const auto connection = client.lock()) owner->sessions.erase(connection);
             });
-            session->setFeedbackCallback(m_feedbackCallback_);
-
+            session->setFeedbackCallback(state->feedback);
             session->start();
-            do_accept();   // 继续等待下一个客户端
+            state->accept();
         });
+    }
+};
+
+RtspServer::RtspServer(boost::asio::io_context& ioContext)
+    : RtspServer(ioContext, RTSP_PORT) {}
+
+RtspServer::RtspServer(boost::asio::io_context& ioContext, unsigned short port)
+    : m_state_(std::make_shared<State>(ioContext, port))
+{
+    start();
+}
+
+RtspServer::~RtspServer() { stop(); }
+
+void RtspServer::start()
+{
+    if (m_state_->started || m_state_->stopped) return;
+    m_state_->started = true;
+    m_state_->accept();
+}
+
+void RtspServer::stop() { m_state_->stop(); }
+
+unsigned short RtspServer::port() const
+{
+    boost::system::error_code ec;
+    const auto endpoint = m_state_->acceptor.local_endpoint(ec);
+    return ec ? 0 : endpoint.port();
+}
+
+void RtspServer::registerSource(const std::shared_ptr<RtpSource>& source)
+{
+    if (!source || source->path().empty()) return;
+    m_state_->sources[source->path()] = source;
+    UAV_LOG_INFO << "RTSP source registered: " << source->path();
+}
+
+std::shared_ptr<RtpSource> RtspServer::findSource(const std::string& path) const
+{
+    return m_state_->find(path);
+}
+
+void RtspServer::setFeedbackCallback(RtcpFeedbackCallback callback)
+{
+    m_state_->feedback = std::move(callback);
+    for (const auto& session : m_state_->sessions)
+        session->setFeedbackCallback(m_state_->feedback);
 }
 
 // =============================== RtspSession ===============================
@@ -268,10 +296,14 @@ void RtspSession::close()
     // 把各路传输从源上摘掉并关闭
     for (auto& kv : m_tracks_)
     {
+        if (m_source_) m_source_->removeSink(kv.second.get());
         kv.second->setPlaying(false);
         kv.second->close();
     }
     m_tracks_.clear();
+    m_source_.reset();
+    // 在途 async_write 仍引用队首，等待完成回调后才能释放。
+    if (!m_writeInProgress_) { m_writeQueue_.clear(); m_writeBytes_ = 0; }
 
     boost::system::error_code ec;
     m_socket_.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
@@ -303,6 +335,7 @@ void RtspSession::do_read()
 
 void RtspSession::on_read(std::size_t bytes)
 {
+    if (m_closed_) return;
     m_bufOffset_ += bytes;
 
     for (;;)
@@ -399,15 +432,19 @@ int RtspSession::parse_request(Request& request)
             // 客户端发来的 RTCP（RR 反馈等）走 interleaved 的 RTCP 通道：
             // 转发给对应传输解析；RTP 通道帧暂不处理（本方向不接收媒体）
             const int channel = static_cast<unsigned char>(data[1]);
+            std::shared_ptr<RtpTransport> target;
             for (const auto& kv : m_tracks_)
             {
                 if (kv.second->config().mode == RtpTransport::Mode::TCP &&
                     channel == kv.second->config().interleavedRtcp)
                 {
-                    kv.second->handleRtcp(reinterpret_cast<const std::uint8_t*>(data + 4),
-                                          frameLen);
+                    target = kv.second;
+                    break;
                 }
             }
+            // 用户反馈回调可以关闭会话；调用时不持有 tracks 的迭代器。
+            if (target) target->handleRtcp(reinterpret_cast<const std::uint8_t*>(data + 4), frameLen);
+            if (m_closed_) return 0;
 
             consume(4 + frameLen);
             data = m_recvBuf_.data();
@@ -531,18 +568,13 @@ void RtspSession::handle_options(const Request& request)
 
 void RtspSession::handle_describe(const Request& request)
 {
-    m_path_ = uriPath(request.uri);
-    if (m_path_.empty())
-        m_path_ = "/";
-
-    const auto source = m_sourceLookup_ ? m_sourceLookup_(m_path_) : nullptr;
-    if (!source)
-        return send_response(404, "Not Found", request);
-
-    // SDP 由源提供：拉流地址对应的就是注册的源
+    std::string path = uriPath(request.uri);
+    if (path.empty()) path = "/";
+    const auto source = m_sourceLookup_ ? m_sourceLookup_(path) : nullptr;
+    if (!source) return send_response(404, "Not Found", request);
     send_response(200, "OK", request,
-                  "Content-Base: " + rtsp_base() + "\r\n",
-                  source->makeSdp(local_ip(), RTSP_PORT), "application/sdp");
+                  "Content-Base: " + rtsp_base(path) + "\r\n",
+                  source->makeSdp(local_ip(), m_socket_.local_endpoint().port()), "application/sdp");
 }
 
 void RtspSession::handle_setup(const Request& request)
@@ -557,10 +589,10 @@ void RtspSession::handle_setup(const Request& request)
     const std::string base = (slash == std::string::npos)
                                  ? std::string("/")
                                  : (slash == 0 ? std::string("/") : path.substr(0, slash));
-    if (m_path_.empty())
-        m_path_ = base;
-
-    const auto source = m_sourceLookup_ ? m_sourceLookup_(m_path_) : nullptr;
+    if (!m_tracks_.empty() && (base != m_path_ || m_playing_))
+        return send_response(455, "Method Not Valid in This State", request);
+    const auto source = m_tracks_.empty()
+        ? (m_sourceLookup_ ? m_sourceLookup_(base) : nullptr) : m_source_;
     if (!source)
         return send_response(404, "Not Found", request);
 
@@ -572,6 +604,7 @@ void RtspSession::handle_setup(const Request& request)
     boost::system::error_code epEc;
     const auto remote = m_socket_.remote_endpoint(epEc);
     config.clientAddress = epEc ? std::string() : remote.address().to_string();
+    config.clockRate = source->clockRate();
     config.ssrc = source->ssrc();         // 回显的 ssrc 与 RTP 包内一致
 
     std::weak_ptr<RtspSession> weak = weak_from_this();
@@ -584,11 +617,14 @@ void RtspSession::handle_setup(const Request& request)
         return send_response(500, "Internal Server Error", request);
 
     transport->setFeedbackCallback(m_feedbackCallback_);
+    transport->setFailureCallback([weak] { if (const auto self = weak.lock()) self->close(); });
+    transport->start();
 
     // re-SETUP：先摘掉旧传输
     const auto old = m_tracks_.find(trackId);
     if (old != m_tracks_.end())
     {
+        if (m_source_) m_source_->removeSink(old->second.get());
         old->second->setPlaying(false);
         old->second->close();
         m_tracks_.erase(old);
@@ -596,6 +632,8 @@ void RtspSession::handle_setup(const Request& request)
 
     if (m_sessionId_.empty())
         m_sessionId_ = "uav-" + std::to_string(s_sessionCounter.fetch_add(1));
+    m_path_ = base;
+    m_source_ = source;
     m_tracks_[trackId] = transport;
 
     send_response(200, "OK", request,
@@ -608,39 +646,38 @@ void RtspSession::handle_play(const Request& request)
     if (!session_valid(request))
         return send_response(454, "Session Not Found", request);
 
-    const auto source = m_sourceLookup_ ? m_sourceLookup_(m_path_) : nullptr;
-    if (!source)
-        return send_response(404, "Not Found", request);
+    if (uriPath(request.uri) != m_path_)
+        return send_response(455, "Method Not Valid in This State", request);
+    if (!m_source_) return send_response(404, "Not Found", request);
 
-    // 握手完成：把该客户端的所有传输订阅到源，源开始转发 RTP
+    std::string info;
     for (auto& kv : m_tracks_)
     {
-        source->addSink(kv.second);
+        // 重新订阅也在完整访问单元边界进行；清除尚未投递的旧数据。
+        m_source_->removeSink(kv.second.get());
+        kv.second->setPlaying(false);
         kv.second->setPlaying(true);
+        const auto sequence = m_source_->addSink(kv.second);
+        if (!info.empty()) info += ",";
+        info += "url=" + rtsp_base(m_path_) + kv.first + ";seq=" + std::to_string(sequence);
     }
     m_playing_ = true;
-
-    std::string extra = "Session: " + m_sessionId_ + "\r\n"
-                        "Range: npt=0.000-\r\n";
-    if (!m_tracks_.empty())
-        extra += "RTP-Info: " + rtp_info() + "\r\n";
-
-    send_response(200, "OK", request, std::move(extra));
+    // 同一 io 线程中响应先入写队列，源线程 post 的媒体随后投递。
+    // 直播没有 NPT 起点，不能声明虚构的 Range/rtptime 映射。
+    send_response(200, "OK", request, "Session: " + m_sessionId_ + "\r\n"
+                  "RTP-Info: " + info + "\r\n");
 }
 
 void RtspSession::handle_pause(const Request& request)
 {
     if (!session_valid(request))
         return send_response(454, "Session Not Found", request);
-
-    const auto source = m_sourceLookup_ ? m_sourceLookup_(m_path_) : nullptr;
-    if (source)
+    if (uriPath(request.uri) != m_path_)
+        return send_response(455, "Method Not Valid in This State", request);
+    for (auto& kv : m_tracks_)
     {
-        for (auto& kv : m_tracks_)
-        {
-            source->removeSink(kv.second.get());
-            kv.second->setPlaying(false);
-        }
+        if (m_source_) m_source_->removeSink(kv.second.get());
+        kv.second->setPlaying(false);
     }
     m_playing_ = false;
     send_response(200, "OK", request, "Session: " + m_sessionId_ + "\r\n");
@@ -650,23 +687,19 @@ void RtspSession::handle_teardown(const Request& request)
 {
     if (!session_valid(request))
         return send_response(454, "Session Not Found", request);
-
-    const auto source = m_sourceLookup_ ? m_sourceLookup_(m_path_) : nullptr;
-    if (source)
+    if (uriPath(request.uri) != m_path_)
+        return send_response(455, "Method Not Valid in This State", request);
+    for (auto& kv : m_tracks_)
     {
-        for (auto& kv : m_tracks_)
-        {
-            source->removeSink(kv.second.get());
-            kv.second->setPlaying(false);
-            kv.second->close();
-        }
+        if (m_source_) m_source_->removeSink(kv.second.get());
+        kv.second->setPlaying(false);
+        kv.second->close();
     }
     m_tracks_.clear();
+    m_source_.reset();
+    m_path_.clear();
     m_playing_ = false;
-
     send_response(200, "OK", request, "Session: " + m_sessionId_ + "\r\n");
-
-    // TEARDOWN 结束会话：之后需要重新 SETUP
     m_sessionId_.clear();
 }
 
@@ -711,6 +744,17 @@ void RtspSession::send_error_and_close(int status, const char* reason)
 
 void RtspSession::queue_write(std::string data)
 {
+    if (m_closed_) return;
+    constexpr std::size_t maxBytes = 2 * 1024 * 1024;
+    constexpr std::size_t maxPackets = 4096;
+    if (data.size() > maxBytes || m_writeBytes_ > maxBytes - data.size() ||
+        m_writeQueue_.size() >= maxPackets)
+    {
+        UAV_LOG_WARN << "RTSP slow client exceeded write queue limit, closing";
+        close();
+        return;
+    }
+    m_writeBytes_ += data.size();
     m_writeQueue_.push_back(std::move(data));
     if (!m_writeInProgress_)
     {
@@ -725,19 +769,18 @@ void RtspSession::do_write()
     boost::asio::async_write(m_socket_, boost::asio::buffer(m_writeQueue_.front()),
         [self](const boost::system::error_code& ec, std::size_t)
         {
-            if (!ec)
-            {
-                self->m_writeQueue_.pop_front();
-                if (!self->m_writeQueue_.empty())
-                    self->do_write();
-                else
-                    self->m_writeInProgress_ = false;
-            }
-            else
+            if (ec || self->m_closed_)
             {
                 self->m_writeInProgress_ = false;
+                self->m_writeQueue_.clear();
+                self->m_writeBytes_ = 0;
                 self->close();
+                return;
             }
+            self->m_writeBytes_ -= self->m_writeQueue_.front().size();
+            self->m_writeQueue_.pop_front();
+            if (!self->m_writeQueue_.empty()) self->do_write();
+            else self->m_writeInProgress_ = false;
         });
 }
 
@@ -775,22 +818,11 @@ std::string RtspSession::local_ip() const
     return "0.0.0.0";
 }
 
-std::string RtspSession::rtsp_base() const
+std::string RtspSession::rtsp_base(const std::string& path) const
 {
-    return "rtsp://" + local_ip() + ":" + std::to_string(RTSP_PORT) + m_path_ + "/";
-}
-
-std::string RtspSession::rtp_info() const
-{
-    const std::string base = rtsp_base();
-    std::string info;
-    for (const auto& kv : m_tracks_)
-    {
-        if (!info.empty())
-            info += ",";
-        info += "url=" + base + kv.first + ";seq=0;rtptime=0";
-    }
-    return info;
+    boost::system::error_code ec;
+    const auto endpoint = m_socket_.local_endpoint(ec);
+    return "rtsp://" + local_ip() + ":" + std::to_string(ec ? RTSP_PORT : endpoint.port()) + path + "/";
 }
 
 bool RtspSession::session_valid(const Request& request) const

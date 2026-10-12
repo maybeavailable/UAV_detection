@@ -15,7 +15,7 @@ constexpr std::size_t kMaxFuPayload  = kMaxRtpPayload - 2;
 
 std::uint32_t random32()
 {
-    static std::mt19937 gen(std::random_device{}());
+    thread_local std::mt19937 gen(std::random_device{}());
     return static_cast<std::uint32_t>(gen());
 }
 
@@ -86,23 +86,28 @@ RtpSource::RtpSource(int payloadType, std::uint32_t clockRate)
 {
 }
 
-void RtpSource::addSink(const std::shared_ptr<RtpTransport>& sink)
+std::uint16_t RtpSource::addSink(const std::shared_ptr<RtpTransport>& sink)
 {
+    std::lock_guard<std::mutex> frameLock(m_frameMutex_);
     if (!sink)
-        return;
+        return m_seq_;
     std::lock_guard<std::mutex> lock(m_sinksMutex_);
+    m_sinks_.erase(std::remove_if(m_sinks_.begin(), m_sinks_.end(),
+        [](const auto& weak) { return weak.expired(); }), m_sinks_.end());
     for (const auto& weak : m_sinks_)
     {
         if (weak.lock() == sink)
-            return;                       // 已订阅
+            return m_seq_;                // 已订阅
     }
     m_sinks_.emplace_back(sink);
+    return m_seq_;
 }
 
 void RtpSource::removeSink(const RtpTransport* sink)
 {
     if (sink == nullptr)
         return;
+    std::lock_guard<std::mutex> frameLock(m_frameMutex_);
     std::lock_guard<std::mutex> lock(m_sinksMutex_);
     for (auto it = m_sinks_.begin(); it != m_sinks_.end(); ++it)
     {
@@ -114,7 +119,8 @@ void RtpSource::removeSink(const RtpTransport* sink)
     }
 }
 
-void RtpSource::pushFrame(const std::uint8_t* annexB, std::size_t size, std::uint64_t ptsUs)
+void RtpSource::pushFrame(const std::uint8_t* annexB, std::size_t size,
+                          std::optional<std::uint64_t> ptsUs)
 {
     if (annexB == nullptr || size == 0)
         return;
@@ -123,18 +129,33 @@ void RtpSource::pushFrame(const std::uint8_t* annexB, std::size_t size, std::uin
     if (nals.empty())
         return;
 
+    std::lock_guard<std::mutex> frameLock(m_frameMutex_);
     const std::uint32_t timestamp = nextTimestamp(ptsUs);
     for (std::size_t i = 0; i < nals.size(); ++i)
         packetizeNal(nals[i], timestamp, i == nals.size() - 1);
 }
 
-std::uint32_t RtpSource::nextTimestamp(std::uint64_t ptsUs)
+std::uint32_t RtpSource::nextTimestamp(std::optional<std::uint64_t> ptsUs)
 {
-    if (ptsUs != 0)
-        return static_cast<std::uint32_t>((ptsUs * m_clockRate_) / 1000000u);
-
-    // 无 pts：按 25fps 推进（测试源用）
-    m_timestamp_ += m_clockRate_ / 25;
+    if (ptsUs)
+    {
+        // 分开计算整秒与余数，避免长时间运行/大 PTS 的乘法溢出。
+        const auto ticks = static_cast<std::uint32_t>(*ptsUs / 1000000u) * m_clockRate_ +
+            static_cast<std::uint32_t>((*ptsUs % 1000000u) * m_clockRate_ / 1000000u);
+        if (!m_ptsOrigin_)
+        {
+            m_ptsOrigin_ = ticks;
+            m_ptsBase_ = m_timestamp_ + (m_hasTimestamp_ ? m_clockRate_ / 25 : 0);
+        }
+        m_timestamp_ = m_ptsBase_ + ticks - *m_ptsOrigin_;
+    }
+    else
+    {
+        if (m_hasTimestamp_)
+            m_timestamp_ += m_clockRate_ / 25;
+        m_ptsOrigin_.reset();
+    }
+    m_hasTimestamp_ = true;
     return m_timestamp_;
 }
 

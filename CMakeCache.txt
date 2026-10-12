@@ -20,6 +20,36 @@ ASCEND_ACL_LIBRARY:FILEPATH=/usr/local/Ascend/ascend-toolkit/latest/aarch64-linu
 //aarch64 交叉编译器前缀
 ASCEND_CROSS_PREFIX:STRING=aarch64-linux-gnu-
 
+//Path to a library.
+ASCEND_LIB_acl_dvpp:FILEPATH=/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64/libacl_dvpp.so
+
+//Path to a library.
+ASCEND_LIB_acl_dvpp_mpi:FILEPATH=/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64/libacl_dvpp_mpi.so
+
+//Path to a library.
+ASCEND_LIB_acl_hdmi_mpi:FILEPATH=/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64/libacl_hdmi_mpi.so
+
+//Path to a library.
+ASCEND_LIB_acl_isp_ae_mpi:FILEPATH=/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64/libacl_isp_ae_mpi.so
+
+//Path to a library.
+ASCEND_LIB_acl_isp_awb_mpi:FILEPATH=/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64/libacl_isp_awb_mpi.so
+
+//Path to a library.
+ASCEND_LIB_acl_isp_mpi:FILEPATH=/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64/libacl_isp_mpi.so
+
+//Path to a library.
+ASCEND_LIB_acl_tde_mpi:FILEPATH=/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64/libacl_tde_mpi.so
+
+//Path to a library.
+ASCEND_LIB_acl_vi_mpi:FILEPATH=/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64/libacl_vi_mpi.so
+
+//Path to a library.
+ASCEND_LIB_acl_vo_mpi:FILEPATH=/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64/libacl_vo_mpi.so
+
+//Path to a library.
+ASCEND_LIB_acl_vpss_mpi:FILEPATH=/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64/libacl_vpss_mpi.so
+
 //The directory containing a CMake configuration file for Boost.
 Boost_DIR:PATH=/home/huangquan/code/UAV_detection/third_party/boost/lib/cmake/Boost-1.88.0
 
@@ -194,6 +224,25 @@ CMAKE_TOOLCHAIN_FILE:FILEPATH=/home/huangquan/code/UAV_detection/cmake/toolchain
 // Studio IDE projects all commands are done without /nologo.
 CMAKE_VERBOSE_MAKEFILE:BOOL=FALSE
 
+//Path to a file.
+EXOSIP2_INCLUDE_DIR:PATH=/home/huangquan/code/UAV_detection/third_party/libeXosip2/include
+
+//Path to a library.
+EXOSIP2_LIBRARY:FILEPATH=/home/huangquan/code/UAV_detection/third_party/libeXosip2/lib/libeXosip2.a
+
+//Path to a file.
+LIBXML2_INCLUDE_DIR:PATH=/home/huangquan/code/UAV_detection/third_party/libxml2/include/libxml2
+
+//Path to a library.
+LIBXML2_LIBRARY:FILEPATH=/home/huangquan/code/UAV_detection/third_party/libxml2/lib/libxml2.a
+
+//Path to a program.
+LIBXML2_XMLLINT_EXECUTABLE:FILEPATH=/usr/bin/xmllint
+
+//libxml2 安装前缀；留空 = third_party/libxml2（aarch64
+// 静态库）
+LibXml2_ROOT:PATH=
+
 //Path to a library.
 OPENSSL_CRYPTO_LIBRARY:FILEPATH=/home/huangquan/code/UAV_detection/third_party/openssl/lib/libcrypto.a
 
@@ -203,6 +252,15 @@ OPENSSL_INCLUDE_DIR:PATH=/home/huangquan/code/UAV_detection/third_party/openssl/
 //Path to a library.
 OPENSSL_SSL_LIBRARY:FILEPATH=/home/huangquan/code/UAV_detection/third_party/openssl/lib/libssl.a
 
+//Path to a library.
+OSIP2_CORE_LIBRARY:FILEPATH=/home/huangquan/code/UAV_detection/third_party/libosip2/lib/libosip2.a
+
+//Path to a file.
+OSIP2_INCLUDE_DIR:PATH=/home/huangquan/code/UAV_detection/third_party/libosip2/include
+
+//Path to a library.
+OSIP2_PARSER_LIBRARY:FILEPATH=/home/huangquan/code/UAV_detection/third_party/libosip2/lib/libosipparser2.a
+
 //Arguments to supply to pkg-config
 PKG_CONFIG_ARGN:STRING=
 
@@ -211,6 +269,9 @@ PKG_CONFIG_EXECUTABLE:FILEPATH=/usr/bin/pkg-config
 
 //使用当前系统的昇腾（CANN/ACL）编译环境
 UAV_ASCEND:BOOL=ON
+
+//启用 GB28181 国标接入（XML 报文 + eXosip2 SIP 信令）
+UAV_GB28181:BOOL=ON
 
 //Value Computed by CMake
 UAV_detection_BINARY_DIR:STATIC=/home/huangquan/code/UAV_detection
@@ -247,6 +308,9 @@ boost_system_DIR:PATH=/home/huangquan/code/UAV_detection/third_party/boost/lib/c
 
 //The directory containing a CMake configuration file for boost_thread.
 boost_thread_DIR:PATH=/home/huangquan/code/UAV_detection/third_party/boost/lib/cmake/boost_thread-1.88.0
+
+//Path to a library.
+pkgcfg_lib_PC_LIBXML_xml2:FILEPATH=/home/huangquan/code/UAV_detection/third_party/libxml2/lib/libxml2.a
 
 //Path to a library.
 pkgcfg_lib__OPENSSL_crypto:FILEPATH=/home/huangquan/code/UAV_detection/third_party/openssl/lib/libcrypto.a
@@ -390,24 +454,81 @@ CMAKE_STRIP-ADVANCED:INTERNAL=1
 CMAKE_UNAME:INTERNAL=/usr/bin/uname
 //ADVANCED property for variable: CMAKE_VERBOSE_MAKEFILE
 CMAKE_VERBOSE_MAKEFILE-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: EXOSIP2_INCLUDE_DIR
+EXOSIP2_INCLUDE_DIR-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: EXOSIP2_LIBRARY
+EXOSIP2_LIBRARY-ADVANCED:INTERNAL=1
 //Details about finding Ascend
 FIND_PACKAGE_MESSAGE_DETAILS_Ascend:INTERNAL=[/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include][/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/lib64/libascendcl.so][v7.2.T8.0.B128:8.0.RC1.alpha003()]
 //Details about finding Boost
 FIND_PACKAGE_MESSAGE_DETAILS_Boost:INTERNAL=[/home/huangquan/code/UAV_detection/third_party/boost/lib/cmake/Boost-1.88.0/BoostConfig.cmake][cfound components: thread filesystem system ][v1.88.0(1.88)]
+//Details about finding EXosip2
+FIND_PACKAGE_MESSAGE_DETAILS_EXosip2:INTERNAL=[/home/huangquan/code/UAV_detection/third_party/libeXosip2/include][/home/huangquan/code/UAV_detection/third_party/libeXosip2/lib/libeXosip2.a][/home/huangquan/code/UAV_detection/third_party/libosip2/lib/libosip2.a;/home/huangquan/code/UAV_detection/third_party/libosip2/lib/libosipparser2.a][/home/huangquan/code/UAV_detection/third_party/libosip2/include][v()]
+//Details about finding LibXml2
+FIND_PACKAGE_MESSAGE_DETAILS_LibXml2:INTERNAL=[/home/huangquan/code/UAV_detection/third_party/libxml2/lib/libxml2.a][/home/huangquan/code/UAV_detection/third_party/libxml2/include/libxml2][v2.9.13(2.9)]
 //Details about finding OpenSSL
 FIND_PACKAGE_MESSAGE_DETAILS_OpenSSL:INTERNAL=[/home/huangquan/code/UAV_detection/third_party/openssl/lib/libcrypto.a][/home/huangquan/code/UAV_detection/third_party/openssl/include][c ][v3.5.9()]
 //Details about finding Threads
 FIND_PACKAGE_MESSAGE_DETAILS_Threads:INTERNAL=[TRUE][v()]
+//ADVANCED property for variable: LIBXML2_INCLUDE_DIR
+LIBXML2_INCLUDE_DIR-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: LIBXML2_LIBRARY
+LIBXML2_LIBRARY-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: LIBXML2_XMLLINT_EXECUTABLE
+LIBXML2_XMLLINT_EXECUTABLE-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: OPENSSL_CRYPTO_LIBRARY
 OPENSSL_CRYPTO_LIBRARY-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: OPENSSL_INCLUDE_DIR
 OPENSSL_INCLUDE_DIR-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: OPENSSL_SSL_LIBRARY
 OPENSSL_SSL_LIBRARY-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: OSIP2_CORE_LIBRARY
+OSIP2_CORE_LIBRARY-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: OSIP2_INCLUDE_DIR
+OSIP2_INCLUDE_DIR-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: OSIP2_PARSER_LIBRARY
+OSIP2_PARSER_LIBRARY-ADVANCED:INTERNAL=1
+PC_LIBXML_CFLAGS:INTERNAL=-I/usr/include/libxml2
+PC_LIBXML_CFLAGS_I:INTERNAL=
+PC_LIBXML_CFLAGS_OTHER:INTERNAL=
+PC_LIBXML_FOUND:INTERNAL=1
+PC_LIBXML_INCLUDEDIR:INTERNAL=/usr/include
+PC_LIBXML_INCLUDE_DIRS:INTERNAL=/usr/include/libxml2
+PC_LIBXML_LDFLAGS:INTERNAL=-L/usr/lib/x86_64-linux-gnu;-lxml2
+PC_LIBXML_LDFLAGS_OTHER:INTERNAL=
+PC_LIBXML_LIBDIR:INTERNAL=/usr/lib/x86_64-linux-gnu
+PC_LIBXML_LIBRARIES:INTERNAL=xml2
+PC_LIBXML_LIBRARY_DIRS:INTERNAL=/usr/lib/x86_64-linux-gnu
+PC_LIBXML_LIBS:INTERNAL=
+PC_LIBXML_LIBS_L:INTERNAL=
+PC_LIBXML_LIBS_OTHER:INTERNAL=
+PC_LIBXML_LIBS_PATHS:INTERNAL=
+PC_LIBXML_MODULE_NAME:INTERNAL=libxml-2.0
+PC_LIBXML_PREFIX:INTERNAL=/usr
+PC_LIBXML_STATIC_CFLAGS:INTERNAL=-I/usr/include/libxml2
+PC_LIBXML_STATIC_CFLAGS_I:INTERNAL=
+PC_LIBXML_STATIC_CFLAGS_OTHER:INTERNAL=
+PC_LIBXML_STATIC_INCLUDE_DIRS:INTERNAL=/usr/include/libxml2
+PC_LIBXML_STATIC_LDFLAGS:INTERNAL=-L/usr/lib/x86_64-linux-gnu;-lxml2;-licui18n;-licuuc;-licudata;-lz;-llzma;-lm
+PC_LIBXML_STATIC_LDFLAGS_OTHER:INTERNAL=
+PC_LIBXML_STATIC_LIBDIR:INTERNAL=
+PC_LIBXML_STATIC_LIBRARIES:INTERNAL=xml2;icui18n;icuuc;icudata;z;lzma;m
+PC_LIBXML_STATIC_LIBRARY_DIRS:INTERNAL=/usr/lib/x86_64-linux-gnu
+PC_LIBXML_STATIC_LIBS:INTERNAL=
+PC_LIBXML_STATIC_LIBS_L:INTERNAL=
+PC_LIBXML_STATIC_LIBS_OTHER:INTERNAL=
+PC_LIBXML_STATIC_LIBS_PATHS:INTERNAL=
+PC_LIBXML_VERSION:INTERNAL=2.9.13
+PC_LIBXML_libxml-2.0_INCLUDEDIR:INTERNAL=
+PC_LIBXML_libxml-2.0_LIBDIR:INTERNAL=
+PC_LIBXML_libxml-2.0_PREFIX:INTERNAL=
+PC_LIBXML_libxml-2.0_VERSION:INTERNAL=
 //ADVANCED property for variable: PKG_CONFIG_ARGN
 PKG_CONFIG_ARGN-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: PKG_CONFIG_EXECUTABLE
 PKG_CONFIG_EXECUTABLE-ADVANCED:INTERNAL=1
+//上次配置使用的 LibXml2_ROOT
+UAV_LIBXML2_ROOT_USED:INTERNAL=/home/huangquan/code/UAV_detection/third_party/libxml2
 _OPENSSL_CFLAGS:INTERNAL=
 _OPENSSL_CFLAGS_I:INTERNAL=
 _OPENSSL_CFLAGS_OTHER:INTERNAL=
@@ -443,7 +564,9 @@ _OPENSSL_openssl_INCLUDEDIR:INTERNAL=
 _OPENSSL_openssl_LIBDIR:INTERNAL=
 _OPENSSL_openssl_PREFIX:INTERNAL=
 _OPENSSL_openssl_VERSION:INTERNAL=
+__pkg_config_arguments_PC_LIBXML:INTERNAL=QUIET;libxml-2.0
 __pkg_config_arguments__OPENSSL:INTERNAL=QUIET;openssl
+__pkg_config_checked_PC_LIBXML:INTERNAL=1
 __pkg_config_checked__OPENSSL:INTERNAL=1
 //ADVANCED property for variable: boost_atomic_DIR
 boost_atomic_DIR-ADVANCED:INTERNAL=1
@@ -455,6 +578,8 @@ boost_headers_DIR-ADVANCED:INTERNAL=1
 boost_system_DIR-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: boost_thread_DIR
 boost_thread_DIR-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: pkgcfg_lib_PC_LIBXML_xml2
+pkgcfg_lib_PC_LIBXML_xml2-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: pkgcfg_lib__OPENSSL_crypto
 pkgcfg_lib__OPENSSL_crypto-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: pkgcfg_lib__OPENSSL_ssl

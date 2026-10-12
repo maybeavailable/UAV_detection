@@ -129,6 +129,270 @@ uav_detection/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/build
 .PHONY : uav_detection/fast
 
+src/camera/mipi_ctl.o: src/camera/mipi_ctl.cpp.o
+.PHONY : src/camera/mipi_ctl.o
+
+# target to build an object file
+src/camera/mipi_ctl.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/camera/mipi_ctl.cpp.o
+.PHONY : src/camera/mipi_ctl.cpp.o
+
+src/camera/mipi_ctl.i: src/camera/mipi_ctl.cpp.i
+.PHONY : src/camera/mipi_ctl.i
+
+# target to preprocess a source file
+src/camera/mipi_ctl.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/camera/mipi_ctl.cpp.i
+.PHONY : src/camera/mipi_ctl.cpp.i
+
+src/camera/mipi_ctl.s: src/camera/mipi_ctl.cpp.s
+.PHONY : src/camera/mipi_ctl.s
+
+# target to generate assembly for a file
+src/camera/mipi_ctl.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/camera/mipi_ctl.cpp.s
+.PHONY : src/camera/mipi_ctl.cpp.s
+
+src/camera/rgb_camera.o: src/camera/rgb_camera.cpp.o
+.PHONY : src/camera/rgb_camera.o
+
+# target to build an object file
+src/camera/rgb_camera.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/camera/rgb_camera.cpp.o
+.PHONY : src/camera/rgb_camera.cpp.o
+
+src/camera/rgb_camera.i: src/camera/rgb_camera.cpp.i
+.PHONY : src/camera/rgb_camera.i
+
+# target to preprocess a source file
+src/camera/rgb_camera.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/camera/rgb_camera.cpp.i
+.PHONY : src/camera/rgb_camera.cpp.i
+
+src/camera/rgb_camera.s: src/camera/rgb_camera.cpp.s
+.PHONY : src/camera/rgb_camera.s
+
+# target to generate assembly for a file
+src/camera/rgb_camera.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/camera/rgb_camera.cpp.s
+.PHONY : src/camera/rgb_camera.cpp.s
+
+src/camera/rgb_camera_ctl.o: src/camera/rgb_camera_ctl.cpp.o
+.PHONY : src/camera/rgb_camera_ctl.o
+
+# target to build an object file
+src/camera/rgb_camera_ctl.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/camera/rgb_camera_ctl.cpp.o
+.PHONY : src/camera/rgb_camera_ctl.cpp.o
+
+src/camera/rgb_camera_ctl.i: src/camera/rgb_camera_ctl.cpp.i
+.PHONY : src/camera/rgb_camera_ctl.i
+
+# target to preprocess a source file
+src/camera/rgb_camera_ctl.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/camera/rgb_camera_ctl.cpp.i
+.PHONY : src/camera/rgb_camera_ctl.cpp.i
+
+src/camera/rgb_camera_ctl.s: src/camera/rgb_camera_ctl.cpp.s
+.PHONY : src/camera/rgb_camera_ctl.s
+
+# target to generate assembly for a file
+src/camera/rgb_camera_ctl.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/camera/rgb_camera_ctl.cpp.s
+.PHONY : src/camera/rgb_camera_ctl.cpp.s
+
+src/camera/shihui_protocol.o: src/camera/shihui_protocol.cpp.o
+.PHONY : src/camera/shihui_protocol.o
+
+# target to build an object file
+src/camera/shihui_protocol.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/camera/shihui_protocol.cpp.o
+.PHONY : src/camera/shihui_protocol.cpp.o
+
+src/camera/shihui_protocol.i: src/camera/shihui_protocol.cpp.i
+.PHONY : src/camera/shihui_protocol.i
+
+# target to preprocess a source file
+src/camera/shihui_protocol.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/camera/shihui_protocol.cpp.i
+.PHONY : src/camera/shihui_protocol.cpp.i
+
+src/camera/shihui_protocol.s: src/camera/shihui_protocol.cpp.s
+.PHONY : src/camera/shihui_protocol.s
+
+# target to generate assembly for a file
+src/camera/shihui_protocol.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/camera/shihui_protocol.cpp.s
+.PHONY : src/camera/shihui_protocol.cpp.s
+
+src/gb28181/gb28181_media.o: src/gb28181/gb28181_media.cpp.o
+.PHONY : src/gb28181/gb28181_media.o
+
+# target to build an object file
+src/gb28181/gb28181_media.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/gb28181/gb28181_media.cpp.o
+.PHONY : src/gb28181/gb28181_media.cpp.o
+
+src/gb28181/gb28181_media.i: src/gb28181/gb28181_media.cpp.i
+.PHONY : src/gb28181/gb28181_media.i
+
+# target to preprocess a source file
+src/gb28181/gb28181_media.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/gb28181/gb28181_media.cpp.i
+.PHONY : src/gb28181/gb28181_media.cpp.i
+
+src/gb28181/gb28181_media.s: src/gb28181/gb28181_media.cpp.s
+.PHONY : src/gb28181/gb28181_media.s
+
+# target to generate assembly for a file
+src/gb28181/gb28181_media.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/gb28181/gb28181_media.cpp.s
+.PHONY : src/gb28181/gb28181_media.cpp.s
+
+src/gb28181/gb28181device.o: src/gb28181/gb28181device.cpp.o
+.PHONY : src/gb28181/gb28181device.o
+
+# target to build an object file
+src/gb28181/gb28181device.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/gb28181/gb28181device.cpp.o
+.PHONY : src/gb28181/gb28181device.cpp.o
+
+src/gb28181/gb28181device.i: src/gb28181/gb28181device.cpp.i
+.PHONY : src/gb28181/gb28181device.i
+
+# target to preprocess a source file
+src/gb28181/gb28181device.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/gb28181/gb28181device.cpp.i
+.PHONY : src/gb28181/gb28181device.cpp.i
+
+src/gb28181/gb28181device.s: src/gb28181/gb28181device.cpp.s
+.PHONY : src/gb28181/gb28181device.s
+
+# target to generate assembly for a file
+src/gb28181/gb28181device.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/gb28181/gb28181device.cpp.s
+.PHONY : src/gb28181/gb28181device.cpp.s
+
+src/gb28181/ps_mux.o: src/gb28181/ps_mux.cpp.o
+.PHONY : src/gb28181/ps_mux.o
+
+# target to build an object file
+src/gb28181/ps_mux.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/gb28181/ps_mux.cpp.o
+.PHONY : src/gb28181/ps_mux.cpp.o
+
+src/gb28181/ps_mux.i: src/gb28181/ps_mux.cpp.i
+.PHONY : src/gb28181/ps_mux.i
+
+# target to preprocess a source file
+src/gb28181/ps_mux.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/gb28181/ps_mux.cpp.i
+.PHONY : src/gb28181/ps_mux.cpp.i
+
+src/gb28181/ps_mux.s: src/gb28181/ps_mux.cpp.s
+.PHONY : src/gb28181/ps_mux.s
+
+# target to generate assembly for a file
+src/gb28181/ps_mux.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/gb28181/ps_mux.cpp.s
+.PHONY : src/gb28181/ps_mux.cpp.s
+
+src/gb28181/ps_rtp_pusher.o: src/gb28181/ps_rtp_pusher.cpp.o
+.PHONY : src/gb28181/ps_rtp_pusher.o
+
+# target to build an object file
+src/gb28181/ps_rtp_pusher.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/gb28181/ps_rtp_pusher.cpp.o
+.PHONY : src/gb28181/ps_rtp_pusher.cpp.o
+
+src/gb28181/ps_rtp_pusher.i: src/gb28181/ps_rtp_pusher.cpp.i
+.PHONY : src/gb28181/ps_rtp_pusher.i
+
+# target to preprocess a source file
+src/gb28181/ps_rtp_pusher.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/gb28181/ps_rtp_pusher.cpp.i
+.PHONY : src/gb28181/ps_rtp_pusher.cpp.i
+
+src/gb28181/ps_rtp_pusher.s: src/gb28181/ps_rtp_pusher.cpp.s
+.PHONY : src/gb28181/ps_rtp_pusher.s
+
+# target to generate assembly for a file
+src/gb28181/ps_rtp_pusher.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/gb28181/ps_rtp_pusher.cpp.s
+.PHONY : src/gb28181/ps_rtp_pusher.cpp.s
+
+src/gb28181/sipsession.o: src/gb28181/sipsession.cpp.o
+.PHONY : src/gb28181/sipsession.o
+
+# target to build an object file
+src/gb28181/sipsession.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/gb28181/sipsession.cpp.o
+.PHONY : src/gb28181/sipsession.cpp.o
+
+src/gb28181/sipsession.i: src/gb28181/sipsession.cpp.i
+.PHONY : src/gb28181/sipsession.i
+
+# target to preprocess a source file
+src/gb28181/sipsession.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/gb28181/sipsession.cpp.i
+.PHONY : src/gb28181/sipsession.cpp.i
+
+src/gb28181/sipsession.s: src/gb28181/sipsession.cpp.s
+.PHONY : src/gb28181/sipsession.s
+
+# target to generate assembly for a file
+src/gb28181/sipsession.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/gb28181/sipsession.cpp.s
+.PHONY : src/gb28181/sipsession.cpp.s
+
+src/gb28181/xmlpacket.o: src/gb28181/xmlpacket.cpp.o
+.PHONY : src/gb28181/xmlpacket.o
+
+# target to build an object file
+src/gb28181/xmlpacket.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/gb28181/xmlpacket.cpp.o
+.PHONY : src/gb28181/xmlpacket.cpp.o
+
+src/gb28181/xmlpacket.i: src/gb28181/xmlpacket.cpp.i
+.PHONY : src/gb28181/xmlpacket.i
+
+# target to preprocess a source file
+src/gb28181/xmlpacket.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/gb28181/xmlpacket.cpp.i
+.PHONY : src/gb28181/xmlpacket.cpp.i
+
+src/gb28181/xmlpacket.s: src/gb28181/xmlpacket.cpp.s
+.PHONY : src/gb28181/xmlpacket.s
+
+# target to generate assembly for a file
+src/gb28181/xmlpacket.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/gb28181/xmlpacket.cpp.s
+.PHONY : src/gb28181/xmlpacket.cpp.s
+
+src/gb28181/xmlpacketparser.o: src/gb28181/xmlpacketparser.cpp.o
+.PHONY : src/gb28181/xmlpacketparser.o
+
+# target to build an object file
+src/gb28181/xmlpacketparser.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/gb28181/xmlpacketparser.cpp.o
+.PHONY : src/gb28181/xmlpacketparser.cpp.o
+
+src/gb28181/xmlpacketparser.i: src/gb28181/xmlpacketparser.cpp.i
+.PHONY : src/gb28181/xmlpacketparser.i
+
+# target to preprocess a source file
+src/gb28181/xmlpacketparser.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/gb28181/xmlpacketparser.cpp.i
+.PHONY : src/gb28181/xmlpacketparser.cpp.i
+
+src/gb28181/xmlpacketparser.s: src/gb28181/xmlpacketparser.cpp.s
+.PHONY : src/gb28181/xmlpacketparser.s
+
+# target to generate assembly for a file
+src/gb28181/xmlpacketparser.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/gb28181/xmlpacketparser.cpp.s
+.PHONY : src/gb28181/xmlpacketparser.cpp.s
+
 src/log/RotateFileWriter.o: src/log/RotateFileWriter.cpp.o
 .PHONY : src/log/RotateFileWriter.o
 
@@ -306,6 +570,39 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... uav_detection"
+	@echo "... src/camera/mipi_ctl.o"
+	@echo "... src/camera/mipi_ctl.i"
+	@echo "... src/camera/mipi_ctl.s"
+	@echo "... src/camera/rgb_camera.o"
+	@echo "... src/camera/rgb_camera.i"
+	@echo "... src/camera/rgb_camera.s"
+	@echo "... src/camera/rgb_camera_ctl.o"
+	@echo "... src/camera/rgb_camera_ctl.i"
+	@echo "... src/camera/rgb_camera_ctl.s"
+	@echo "... src/camera/shihui_protocol.o"
+	@echo "... src/camera/shihui_protocol.i"
+	@echo "... src/camera/shihui_protocol.s"
+	@echo "... src/gb28181/gb28181_media.o"
+	@echo "... src/gb28181/gb28181_media.i"
+	@echo "... src/gb28181/gb28181_media.s"
+	@echo "... src/gb28181/gb28181device.o"
+	@echo "... src/gb28181/gb28181device.i"
+	@echo "... src/gb28181/gb28181device.s"
+	@echo "... src/gb28181/ps_mux.o"
+	@echo "... src/gb28181/ps_mux.i"
+	@echo "... src/gb28181/ps_mux.s"
+	@echo "... src/gb28181/ps_rtp_pusher.o"
+	@echo "... src/gb28181/ps_rtp_pusher.i"
+	@echo "... src/gb28181/ps_rtp_pusher.s"
+	@echo "... src/gb28181/sipsession.o"
+	@echo "... src/gb28181/sipsession.i"
+	@echo "... src/gb28181/sipsession.s"
+	@echo "... src/gb28181/xmlpacket.o"
+	@echo "... src/gb28181/xmlpacket.i"
+	@echo "... src/gb28181/xmlpacket.s"
+	@echo "... src/gb28181/xmlpacketparser.o"
+	@echo "... src/gb28181/xmlpacketparser.i"
+	@echo "... src/gb28181/xmlpacketparser.s"
 	@echo "... src/log/RotateFileWriter.o"
 	@echo "... src/log/RotateFileWriter.i"
 	@echo "... src/log/RotateFileWriter.s"

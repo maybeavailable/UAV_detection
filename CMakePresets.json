@@ -7,6 +7,29 @@
   },
   "configurePresets": [
     {
+      "name": "rtsp-native",
+      "displayName": "RTSP 本机回归测试",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/rtsp-native",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "UAV_GATEWAY": "OFF",
+        "UAV_RTSP_ONLY": "ON",
+        "UAV_RTSP_TESTS": "ON"
+      }
+    },
+    {
+      "name": "gateway-native",
+      "displayName": "Gateway 本机开发与接口测试",
+      "generator": "Unix Makefiles",
+      "binaryDir": "${sourceDir}/build/gateway-native",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "UAV_GATEWAY_ONLY": "ON",
+        "UAV_GATEWAY_TESTS": "ON"
+      }
+    },
+    {
       "name": "ascend-aarch64",
       "displayName": "昇腾 aarch64 (CANN) - Debug",
       "description": "使用当前系统的昇腾 CANN 编译环境（aarch64-linux）+ aarch64-linux-gnu 交叉编译器",
@@ -41,6 +64,14 @@
   ],
   "buildPresets": [
     {
+      "name": "rtsp-native",
+      "configurePreset": "rtsp-native"
+    },
+    {
+      "name": "gateway-native",
+      "configurePreset": "gateway-native"
+    },
+    {
       "name": "ascend-aarch64",
       "configurePreset": "ascend-aarch64"
     },
@@ -51,6 +82,22 @@
     {
       "name": "native",
       "configurePreset": "native"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "rtsp-native",
+      "configurePreset": "rtsp-native",
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "gateway-native",
+      "configurePreset": "gateway-native",
+      "output": {
+        "outputOnFailure": true
+      }
     }
   ]
 }

@@ -3,7 +3,8 @@
 #include"common/common.h"
 
 #include<cstdint>
-#include<ctime>
+#include<chrono>
+#include<algorithm>
 #include<functional>
 #include<vector>
 
@@ -68,7 +69,7 @@ public:
     // 迭代到下一个完整子包；数据不足/版本非法/截断返回 false
     bool next()
     {
-        while (m_offset_ + 4 <= m_size_)
+        while (m_data_ && m_offset_ + 4 <= m_size_)
         {
             const std::uint8_t* h = m_data_ + m_offset_;
             if ((h[0] >> 6) != 2)
@@ -83,6 +84,13 @@ public:
 
             m_payload_     = h + 4;
             m_payloadSize_ = bytes - 4;
+            if (h[0] & 0x20u)
+            {
+                const std::size_t padding = h[bytes - 1];
+                if (padding == 0 || padding > m_payloadSize_)
+                    return false;
+                m_payloadSize_ -= padding;
+            }
             m_offset_ += bytes;
 
             if (m_type_ == 0)
@@ -97,12 +105,16 @@ public:
     const std::uint8_t* payload() const { return m_payload_; }
     std::size_t   payloadSize() const { return m_payloadSize_; }
 
-    // RR：报告块从 payload 开头；SR：跳过 20 字节发送者信息
+    // payload 尚包含 4 字节发送者 SSRC；SR 另有 20 字节发送者信息。
     std::vector<RtcpReportBlock> reportBlocks() const
     {
         std::vector<RtcpReportBlock> blocks;
-        std::size_t offset = (m_type_ == RTCP_SR) ? 20u : 0u;
-        while (offset + 24 <= m_payloadSize_)
+        if (m_type_ != RTCP_SR && m_type_ != RTCP_RR)
+            return blocks;
+        std::size_t offset = (m_type_ == RTCP_SR) ? 24u : 4u;
+        if (offset + 24u * m_reportCount_ > m_payloadSize_)
+            return blocks;
+        for (unsigned i = 0; i < m_reportCount_; ++i)
         {
             const std::uint8_t* p = m_payload_ + offset;
 
@@ -143,20 +155,29 @@ private:
 };
 
 // 当前 NTP 时间的中间 32 位（1/65536 秒单位，用于 RTT 计算）
+inline std::uint64_t rtcpNtpNow(
+    std::chrono::system_clock::time_point now = std::chrono::system_clock::now())
+{
+    using namespace std::chrono;
+    const auto ns = duration_cast<nanoseconds>(now.time_since_epoch()).count();
+    const auto seconds = static_cast<std::uint64_t>(ns / 1000000000LL) + 2208988800ULL;
+    const auto fraction = (static_cast<std::uint64_t>(ns % 1000000000LL) << 32) / 1000000000ULL;
+    return (seconds << 32) | fraction;
+}
+
 inline std::uint32_t rtcpNtpMiddle32Now()
 {
-    const std::uint64_t seconds =
-        static_cast<std::uint64_t>(std::time(nullptr)) + 2208988800ULL;
-    return static_cast<std::uint32_t>(seconds << 16);
+    return static_cast<std::uint32_t>(rtcpNtpNow() >> 16);
 }
 
 // LSR/DLSR → RTT（毫秒）。RFC 3550 §A.8：RTT = now - LSR - DLSR
 // 注意：LSR == 0 表示客户端还没收到过我们的 SR，无法计算，返回 0。
-inline double rtcpRttMs(std::uint32_t lsr, std::uint32_t dlsr)
+inline double rtcpRttMs(std::uint32_t lsr, std::uint32_t dlsr,
+                        std::uint32_t now = rtcpNtpMiddle32Now())
 {
     if (lsr == 0)
         return 0.0;
     const std::int32_t delta =
-        static_cast<std::int32_t>(rtcpNtpMiddle32Now() - lsr - dlsr);
-    return delta * (1000.0 / 65536.0);
+        static_cast<std::int32_t>(now - lsr - dlsr);
+    return std::max(0.0, delta * (1000.0 / 65536.0));
 }

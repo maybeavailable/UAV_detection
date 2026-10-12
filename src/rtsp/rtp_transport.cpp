@@ -4,7 +4,6 @@
 #include"log/log.h"
 
 #include<chrono>
-#include<ctime>
 #include<sstream>
 
 RtpTransport::RtpTransport(boost::asio::io_context& io, Config config, InterleavedWriter tcpWriter)
@@ -64,7 +63,10 @@ RtpTransport::RtpTransport(boost::asio::io_context& io, Config config, Interleav
         return;
     }
 
-    startRtcpReceiveLoop();
+    m_config_.serverRtp = m_udpRtp_.local_endpoint().port();
+    m_config_.serverRtcp = m_udpRtcp_.local_endpoint().port();
+    m_udpRtp_.non_blocking(true, ec);
+    m_udpRtcp_.non_blocking(true, ec);
 }
 
 RtpTransport::~RtpTransport()
@@ -89,84 +91,153 @@ std::string RtpTransport::transportEcho() const
     return oss.str();
 }
 
+void RtpTransport::start()
+{
+    if (m_started_ || !isOpen()) return;
+    m_started_ = true;
+    if (m_config_.mode == Mode::UDP) startRtcpReceiveLoop();
+}
+
+void RtpTransport::setFailureCallback(std::function<void()> callback)
+{
+    m_onFailure_ = std::move(callback);
+}
+
+std::size_t RtpTransport::pendingBytes() const
+{
+    std::lock_guard<std::mutex> lock(m_pendingMutex_);
+    return m_pendingBytes_;
+}
+
 void RtpTransport::deliverRtp(const std::shared_ptr<const std::vector<std::uint8_t>>& packet)
 {
-    if (!m_open_.load(std::memory_order_relaxed) || !packet || packet->size() < 12)
-        return;
+    if (!packet || packet->size() < 12) return;
+    bool schedule = false;
+    {
+        std::lock_guard<std::mutex> lock(m_pendingMutex_);
+        if (!isOpen() || !m_playing_.load() || m_overflow_) return;
+        if (packet->size() > m_config_.maxPendingBytes ||
+            m_pendingBytes_ > m_config_.maxPendingBytes - packet->size() ||
+            m_pending_.size() >= m_config_.maxPendingPackets)
+        {
+            m_overflow_ = true;
+            m_pending_.clear();
+            m_pendingBytes_ = 0;
+        }
+        else
+        {
+            m_pending_.push_back(packet);
+            m_pendingBytes_ += packet->size();
+        }
+        if (!m_drainScheduled_)
+        {
+            m_drainScheduled_ = true;
+            schedule = true;
+        }
+    }
+    // 每个会话至多一个 drain 在途，不能为每个 RTP 包建立无界 post 队列。
+    if (schedule)
+        boost::asio::post(m_io_, [self = shared_from_this()] { self->drainRtp(); });
+}
 
-    boost::asio::post(m_io_, [self = shared_from_this(), packet] {
-        self->doDeliverRtp(packet);
-    });
+void RtpTransport::drainRtp()
+{
+    for (unsigned i = 0; i < 64; ++i)
+    {
+        std::shared_ptr<const std::vector<std::uint8_t>> packet;
+        bool overflow;
+        {
+            std::lock_guard<std::mutex> lock(m_pendingMutex_);
+            overflow = m_overflow_;
+            if (!isOpen() || !m_playing_.load() || overflow || m_pending_.empty())
+            {
+                m_pending_.clear();
+                m_pendingBytes_ = 0;
+                m_drainScheduled_ = false;
+            }
+            else
+            {
+                packet = std::move(m_pending_.front());
+                m_pending_.pop_front();
+                m_pendingBytes_ -= packet->size();
+            }
+        }
+        if (overflow) { fail(); return; }
+        if (!packet) return;
+        doDeliverRtp(packet);
+    }
+    // 分批发送，给 RTSP 控制命令和其他客户端留出调度机会。
+    boost::asio::post(m_io_, [self = shared_from_this()] { self->drainRtp(); });
+}
+
+void RtpTransport::fail()
+{
+    close();
+    if (m_onFailure_) m_onFailure_();
 }
 
 void RtpTransport::doDeliverRtp(const std::shared_ptr<const std::vector<std::uint8_t>>& packet)
 {
-    if (!m_open_.load(std::memory_order_relaxed))
-        return;
-
+    if (!isOpen() || !m_playing_.load()) return;
     const RtpPacketParser rtp(packet->data(), packet->size());
-    if (!rtp.valid())
-        return;                           // 非法 RTP 包直接丢
-    m_lastRtpTimestamp_ = rtp.timestamp();
-
+    if (!rtp.valid()) return;
     if (m_config_.mode == Mode::TCP)
     {
-        if (m_tcpWriter_)
-            m_tcpWriter_(m_config_.interleavedRtp, packet);
+        if (!m_tcpWriter_) return;
+        m_tcpWriter_(m_config_.interleavedRtp, packet);
+        if (!isOpen()) return;  // 写队列溢出可同步关闭整个会话
     }
     else
     {
         boost::system::error_code ec;
-        m_udpRtp_.send(boost::asio::buffer(*packet), 0, ec);
-        if (ec && ec != boost::asio::error::would_block &&
-            ec != boost::asio::error::try_again)
-        {
-            UAV_LOG_DEBUG << "RTP send failed: " << ec.message() << " (dropping packet)";
-        }
-        // 实时流惯例：发送缓冲满/对端不可达时丢包，绝不阻塞编码线程
+        const auto sent = m_udpRtp_.send(boost::asio::buffer(*packet), 0, ec);
+        if (ec || sent != packet->size()) return;
     }
-
+    m_lastRtpTimestamp_ = rtp.timestamp();
+    m_lastRtpTime_ = std::chrono::steady_clock::now();
     ++m_sentPackets_;
-    m_sentOctets_ += packet->size();
+    m_sentOctets_ += rtp.payloadSize();
     ensureRtcpTimer();
 }
 
 void RtpTransport::setPlaying(bool playing)
 {
-    m_playing_.store(playing, std::memory_order_relaxed);
+    m_playing_.store(playing);
+    if (playing) start();
+    else
+    {
+        std::lock_guard<std::mutex> lock(m_pendingMutex_);
+        m_pending_.clear();
+        m_pendingBytes_ = 0;
+    }
 }
 
 void RtpTransport::close()
 {
-    if (!m_open_.exchange(false))
-        return;
-
+    m_open_.store(false);
+    m_playing_.store(false);
+    {
+        std::lock_guard<std::mutex> lock(m_pendingMutex_);
+        m_pending_.clear();
+        m_pendingBytes_ = 0;
+    }
+    try { m_rtcpTimer_.cancel(); } catch (const std::exception&) {}
     boost::system::error_code ec;
-    try
-    {
-        m_rtcpTimer_.cancel();            // Boost 1.88：cancel() 不接受 error_code，失败会抛
-    }
-    catch (const std::exception&)
-    {
-    }
-    if (m_config_.mode == Mode::UDP)
-    {
-        m_udpRtp_.close(ec);
-        m_udpRtcp_.close(ec);
-    }
+    m_udpRtp_.close(ec);
+    m_udpRtcp_.close(ec);
 }
 
 void RtpTransport::startRtcpReceiveLoop()
 {
-    // 注意用裸 this：本函数在构造函数里被调用，此时 shared_from_this() 会抛 bad_weak_ptr。
-    // 安全性：出错（含关闭）时回调只检查 ec 就返回、不触碰任何成员；
-    // 对象析构必然先 close() socket，挂起的 async_receive 会以 ec != 0 结束。
-    m_udpRtcp_.async_receive(boost::asio::buffer(m_rtcpBuf_),
-        [this](const boost::system::error_code& ec, std::size_t bytes) {
-            if (ec)
-                return;               // 已关闭
-            handleRtcp(reinterpret_cast<const std::uint8_t*>(m_rtcpBuf_.data()), bytes);
-            startRtcpReceiveLoop();
+    if (!isOpen()) return;
+    // 缓冲独立存活到回调结束；weak_ptr 避免接收循环永久持有传输对象。
+    auto buffer = std::make_shared<std::array<std::uint8_t, 2048>>();
+    m_udpRtcp_.async_receive(boost::asio::buffer(*buffer),
+        [weak = weak_from_this(), buffer](const boost::system::error_code& ec, std::size_t bytes) {
+            const auto self = weak.lock();
+            if (!self || !self->isOpen() || ec) return;
+            self->handleRtcp(buffer->data(), bytes);
+            if (self->isOpen()) self->startRtcpReceiveLoop();
         });
 }
 
@@ -177,6 +248,7 @@ void RtpTransport::setFeedbackCallback(FeedbackCallback callback)
 
 bool RtpTransport::lastFeedback(RtcpFeedback& out) const
 {
+    std::lock_guard<std::mutex> lock(m_feedbackMutex_);
     if (!m_hasFeedback_.load(std::memory_order_relaxed))
         return false;
     out = m_lastFeedback_;
@@ -209,8 +281,11 @@ void RtpTransport::handleRtcp(const std::uint8_t* data, std::size_t size)
             feedback.jitter         = block.jitter;
             feedback.rttMs          = rtcpRttMs(block.lsr, block.dlsr);
 
-            m_lastFeedback_ = feedback;
-            m_hasFeedback_.store(true, std::memory_order_relaxed);
+            {
+                std::lock_guard<std::mutex> lock(m_feedbackMutex_);
+                m_lastFeedback_ = feedback;
+                m_hasFeedback_.store(true, std::memory_order_relaxed);
+            }
 
             const std::string who = (m_config_.mode == Mode::TCP)
                                         ? std::string("tcp-interleaved")
@@ -245,69 +320,52 @@ void RtpTransport::ensureRtcpTimer()
 
 void RtpTransport::scheduleRtcp()
 {
-    m_rtcpTimer_.expires_after(std::chrono::seconds(5));
-    auto self = shared_from_this();
-    m_rtcpTimer_.async_wait([self](const boost::system::error_code& ec) {
-        if (ec)
-        {
-            self->m_rtcpTimerActive_ = false;
-            return;
-        }
+    if (!isOpen()) { m_rtcpTimerActive_ = false; return; }
+    m_rtcpTimer_.expires_after(m_config_.rtcpInterval);
+    m_rtcpTimer_.async_wait([weak = weak_from_this()](const boost::system::error_code& ec) {
+        const auto self = weak.lock();
+        if (!self) return;
+        if (ec || !self->isOpen()) { self->m_rtcpTimerActive_ = false; return; }
         self->sendRtcpSr();
         self->scheduleRtcp();
     });
 }
 
-// RTCP Sender Report（RFC 3550）：每 5 秒一次，让客户端知道会话仍活跃
 void RtpTransport::sendRtcpSr()
 {
-    if (!m_open_.load(std::memory_order_relaxed) ||
-        !m_playing_.load(std::memory_order_relaxed) ||
-        m_sentPackets_ == 0)
-    {
-        return;
-    }
+    if (!isOpen() || !m_playing_.load() || m_sentPackets_ == 0) return;
+    const auto steadyNow = std::chrono::steady_clock::now();
+    const auto ntp = rtcpNtpNow();
+    const auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(steadyNow - m_lastRtpTime_).count();
+    const auto rtpTs = m_lastRtpTimestamp_ + static_cast<std::uint32_t>(
+        (elapsed / 1000000) * m_config_.clockRate + (elapsed % 1000000) * m_config_.clockRate / 1000000);
+    auto sr = std::make_shared<std::vector<std::uint8_t>>(28, 0);
+    auto write32 = [&](std::size_t offset, std::uint32_t value) {
+        for (int i = 0; i < 4; ++i) (*sr)[offset + i] = static_cast<std::uint8_t>(value >> (24 - i * 8));
+    };
+    (*sr)[0] = 0x80; (*sr)[1] = RTCP_SR; (*sr)[3] = 6;
+    write32(4, m_config_.ssrc);
+    write32(8, static_cast<std::uint32_t>(ntp >> 32));
+    write32(12, static_cast<std::uint32_t>(ntp));
+    write32(16, rtpTs);
+    write32(20, static_cast<std::uint32_t>(m_sentPackets_));
+    write32(24, static_cast<std::uint32_t>(m_sentOctets_));
 
-    auto sr = std::make_shared<std::vector<std::uint8_t>>(28);
-    std::uint8_t* b = sr->data();
-
-    b[0] = 0x80;      // V=2
-    b[1] = 200;       // SR
-    b[2] = 0;
-    b[3] = 6;         // 长度 = 28/4 - 1
-
-    const std::uint32_t ssrc = m_config_.ssrc;
-    b[4]  = static_cast<std::uint8_t>(ssrc >> 24);
-    b[5]  = static_cast<std::uint8_t>(ssrc >> 16);
-    b[6]  = static_cast<std::uint8_t>(ssrc >> 8);
-    b[7]  = static_cast<std::uint8_t>(ssrc);
-
-    // NTP 时间（1900 纪元），简化：秒 + 0 小数
-    const std::uint64_t ntpSeconds = static_cast<std::uint64_t>(std::time(nullptr)) + 2208988800ULL;
-    b[8]  = static_cast<std::uint8_t>(ntpSeconds >> 24);
-    b[9]  = static_cast<std::uint8_t>(ntpSeconds >> 16);
-    b[10] = static_cast<std::uint8_t>(ntpSeconds >> 8);
-    b[11] = static_cast<std::uint8_t>(ntpSeconds);
-    b[12] = b[13] = b[14] = b[15] = 0;
-
-    const std::uint32_t rtpTs = m_lastRtpTimestamp_;
-    b[16] = static_cast<std::uint8_t>(rtpTs >> 24);
-    b[17] = static_cast<std::uint8_t>(rtpTs >> 16);
-    b[18] = static_cast<std::uint8_t>(rtpTs >> 8);
-    b[19] = static_cast<std::uint8_t>(rtpTs);
-
-    const std::uint64_t packets = m_sentPackets_;
-    const std::uint64_t octets  = m_sentOctets_;
-    for (int i = 0; i < 4; ++i)
-    {
-        b[20 + i] = static_cast<std::uint8_t>(packets >> (24 - 8 * i));
-        b[24 + i] = static_cast<std::uint8_t>(octets >> (24 - 8 * i));
-    }
-
+    std::ostringstream name;
+    name << "uav-" << std::hex << m_config_.ssrc;
+    const std::string cname = name.str();
+    const std::size_t sdesSize = (4 + 4 + 2 + cname.size() + 1 + 3) & ~std::size_t(3);
+    sr->resize(28 + sdesSize, 0);
+    (*sr)[28] = 0x81; (*sr)[29] = RTCP_SDES;
+    const auto words = sdesSize / 4 - 1;
+    (*sr)[30] = static_cast<std::uint8_t>(words >> 8);
+    (*sr)[31] = static_cast<std::uint8_t>(words);
+    write32(32, m_config_.ssrc);
+    (*sr)[36] = 1; (*sr)[37] = static_cast<std::uint8_t>(cname.size());
+    std::copy(cname.begin(), cname.end(), sr->begin() + 38);
     if (m_config_.mode == Mode::TCP)
     {
-        if (m_tcpWriter_)
-            m_tcpWriter_(m_config_.interleavedRtcp, sr);
+        if (m_tcpWriter_) m_tcpWriter_(m_config_.interleavedRtcp, sr);
     }
     else
     {

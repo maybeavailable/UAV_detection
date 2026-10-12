@@ -51,6 +51,40 @@ public:
     // 需要留存请自行拷贝
     using receive_callback_t = std::function<void(const std::uint8_t *data, std::size_t len)>;
 
+    // 链路异常类型
+    enum class Error
+    {
+        NotOpen = 0,    // 串口未打开（或已被关闭）
+        ReadFailed,     // 读取失败（errno 级，如设备拔出 EIO/ENXIO）
+        WriteFailed,    // 写入失败
+        PeerClosed,     // 读到 EOF：对端/设备已断开（伪终端从端关闭、USB 串口被摘掉）
+        WriteTimeout    // 等待可写超时
+    };
+
+    static const char *error_str(Error err)
+    {
+        switch (err)
+        {
+        case Error::NotOpen:      return "串口未打开";
+        case Error::ReadFailed:   return "读取失败";
+        case Error::WriteFailed:  return "写入失败";
+        case Error::PeerClosed:   return "链路断开(EOF)";
+        case Error::WriteTimeout: return "写等待超时";
+        }
+        return "未知错误";
+    }
+
+    // 链路异常回调：err 为异常类型，sys_errno 为对应的 errno（没有则为 0）
+    //
+    // 语义与注意事项：
+    //   * **沿触发**：只在"正常 → 异常"时回调一次，不会每 100ms 重复刷；
+    //     链路恢复（读到数据/写入成功，或显式 clear_error()）后才会再次触发。
+    //   * 回调在**发现异常的那个线程**执行（通常是接收线程），且已释放内部锁，
+    //     因此回调里可以安全调用 read/write；但不要在里面 close()/stop_receive()
+    //     或 join 接收线程（那是在等自己），需要重连请投递到别的线程做。
+    //   * 请在 open() 之前或之后任意时刻设置，设置本身线程安全。
+    using error_callback_t = std::function<void(Error err, int sys_errno)>;
+
     Urt() = default;
     ~Urt() { close(); }
 
@@ -176,8 +210,13 @@ public:
         {
             return -1;
         }
-        std::lock_guard<std::mutex> wlock(m_write_mutex);
-        return write_locked(data, len);
+        int n = 0;
+        {
+            std::lock_guard<std::mutex> wlock(m_write_mutex);
+            n = write_locked(data, len);
+        }
+        dispatch_error();
+        return n;
     }
 
     int write(const std::vector<std::uint8_t> &data)
@@ -201,8 +240,13 @@ public:
         {
             return -1;
         }
-        std::lock_guard<std::mutex> rlock(m_read_mutex);
-        return read_locked(buf, len, resolve_timeout(timeout_ms), false);
+        int n = 0;
+        {
+            std::lock_guard<std::mutex> rlock(m_read_mutex);
+            n = read_locked(buf, len, resolve_timeout(timeout_ms), false);
+        }
+        dispatch_error();      // 回调在锁外派发，回调里可以安全再调用 read/write
+        return n;
     }
 
     // 收到任意字节即返回（等一条短应答时延迟最低）
@@ -212,8 +256,13 @@ public:
         {
             return -1;
         }
-        std::lock_guard<std::mutex> rlock(m_read_mutex);
-        return read_locked(buf, len, resolve_timeout(timeout_ms), true);
+        int n = 0;
+        {
+            std::lock_guard<std::mutex> rlock(m_read_mutex);
+            n = read_locked(buf, len, resolve_timeout(timeout_ms), true);
+        }
+        dispatch_error();
+        return n;
     }
 
     // -----------------------------------------------------------------------
@@ -230,25 +279,35 @@ public:
             return -1;
         }
 
-        std::lock_guard<std::mutex> wlock(m_write_mutex);
-        std::lock_guard<std::mutex> rlock(m_read_mutex);
-
-        const int fd = current_fd();
-        if (fd < 0)
+        int result = 0;
         {
-            UAV_LOG_WARN << "Urt::transact 串口未打开\n";
-            return -1;
+            std::lock_guard<std::mutex> wlock(m_write_mutex);
+            std::lock_guard<std::mutex> rlock(m_read_mutex);
+
+            const int fd = current_fd();
+            if (fd < 0)
+            {
+                UAV_LOG_WARN << "Urt::transact 串口未打开\n";
+                mark_error(Error::NotOpen, 0);
+                result = -1;
+            }
+            else
+            {
+                ::tcflush(fd, TCIFLUSH);    // 丢掉上一次可能残留的字节，避免误判应答
+
+                if (write_locked(tx, tx_len) < 0)
+                {
+                    result = -1;
+                }
+                else
+                {
+                    ::tcdrain(fd);          // 等数据真正送出，再开始等应答
+                    result = read_locked(rx, rx_len, resolve_timeout(timeout_ms), true);
+                }
+            }
         }
-
-        ::tcflush(fd, TCIFLUSH);        // 丢掉上一次可能残留的字节，避免误判应答
-
-        if (write_locked(tx, tx_len) < 0)
-        {
-            return -1;
-        }
-        ::tcdrain(fd);                  // 等数据真正送出，再开始等应答
-
-        return read_locked(rx, rx_len, resolve_timeout(timeout_ms), true);
+        dispatch_error();                   // 锁外派发，回调里可安全再调用 read/write
+        return result;
     }
 
     // 丢弃收发缓冲中的数据
@@ -322,6 +381,28 @@ public:
 
     // 设置 read()/read_some()/transact() 不显式传超时时使用的默认值（毫秒）
     void set_read_timeout_ms(int timeout_ms) { m_default_read_timeout_ms = timeout_ms; }
+
+    // ---- 链路异常回调与状态 ----
+    void set_error_callback(error_callback_t callback)
+    {
+        std::lock_guard<std::mutex> lock(m_cb_mutex);
+        m_error_callback = std::move(callback);
+    }
+
+    // 当前是否处于"链路异常"状态（异常后一直为 true，直到链路恢复或 clear_error()）
+    bool has_error() const { return m_error_active.load(std::memory_order_acquire); }
+    Error last_error() const
+    {
+        return static_cast<Error>(m_last_error.load(std::memory_order_relaxed));
+    }
+    int last_errno() const { return m_last_errno.load(std::memory_order_relaxed); }
+
+    // 手动清除异常状态（例如上层重连成功后调用），会重新武装回调
+    void clear_error()
+    {
+        m_error_active.store(false, std::memory_order_release);
+        m_error_pending.store(false, std::memory_order_release);
+    }
 
 private:
     // 取当前 fd（短锁）。未打开返回 -1
@@ -455,6 +536,7 @@ private:
         if (fd < 0)
         {
             UAV_LOG_WARN << "Urt::write 串口未打开\n";
+            mark_error(Error::NotOpen, 0);
             return -1;
         }
 
@@ -480,11 +562,15 @@ private:
                     continue;
                 }
                 UAV_LOG_WARN << "Urt::write 等待可写超时(" << m_write_timeout_ms << "ms)\n";
+                mark_error(Error::WriteTimeout, 0);
                 return (sent > 0) ? static_cast<int>(sent) : -1;
             }
             UAV_LOG_ERROR << "Urt::write 失败: " << strerror(errno) << "\n";
+            mark_error(Error::WriteFailed, errno);
             return (sent > 0) ? static_cast<int>(sent) : -1;
         }
+
+        mark_recovered();   // 写成功 → 链路正常
         return static_cast<int>(sent);
     }
 
@@ -496,6 +582,7 @@ private:
         if (fd < 0)
         {
             UAV_LOG_WARN << "Urt::read 串口未打开\n";
+            mark_error(Error::NotOpen, 0);
             return -1;
         }
 
@@ -513,6 +600,7 @@ private:
                     continue;
                 }
                 UAV_LOG_ERROR << "Urt::read poll 失败: " << strerror(errno) << "\n";
+                mark_error(Error::ReadFailed, errno);
                 return (got > 0) ? static_cast<int>(got) : -1;
             }
             if (pr == 0)
@@ -537,11 +625,21 @@ private:
                     continue;
                 }
                 UAV_LOG_ERROR << "Urt::read 失败: " << strerror(errno) << "\n";
+                mark_error(Error::ReadFailed, errno);
                 return (got > 0) ? static_cast<int>(got) : -1;
             }
-            break;          // 0：对端关闭（伪终端/设备拔出）
+
+            // n == 0：读到 EOF —— 设备被摘掉/对端关闭，属于链路断开而不是"没数据"。
+            // 这里返回 -1（而不是 0），既能与超时区分，也避免接收线程在 EOF 上空转
+            UAV_LOG_ERROR << "Urt::read 链路断开(EOF): 设备可能已被拔出\n";
+            mark_error(Error::PeerClosed, 0);
+            return (got > 0) ? static_cast<int>(got) : -1;
         }
 
+        if (got > 0)
+        {
+            mark_recovered();   // 读到数据 → 链路正常，重新武装异常回调
+        }
         return static_cast<int>(got);
     }
 
@@ -555,6 +653,51 @@ private:
     // ---- 收发串行化 ----
     mutable std::mutex m_write_mutex;    // 串行化写
     mutable std::mutex m_read_mutex;     // 串行化读
+
+    // ---- 链路异常状态 ----
+    // 在持锁的 I/O 路径里只置标志（mark_error），回调统一在锁外派发（dispatch_error），
+    // 避免"回调里再调用 read/write 造成自锁"
+    void mark_error(Error err, int sys_errno)
+    {
+        m_last_error.store(static_cast<int>(err), std::memory_order_relaxed);
+        m_last_errno.store(sys_errno, std::memory_order_relaxed);
+        if (!m_error_active.exchange(true, std::memory_order_acq_rel))
+        {
+            m_error_pending.store(true, std::memory_order_release);   // 只在"沿"上排队一次
+        }
+    }
+
+    // 读到数据 / 写入成功 → 认为链路恢复正常，重新武装异常回调
+    void mark_recovered()
+    {
+        m_error_active.store(false, std::memory_order_release);
+    }
+
+    // 在锁外派发异常回调（每次异常只回调一次）
+    void dispatch_error()
+    {
+        if (!m_error_pending.exchange(false, std::memory_order_acq_rel))
+        {
+            return;
+        }
+        error_callback_t callback;
+        {
+            std::lock_guard<std::mutex> lock(m_cb_mutex);
+            callback = m_error_callback;
+        }
+        if (callback)
+        {
+            callback(static_cast<Error>(m_last_error.load(std::memory_order_relaxed)),
+                     m_last_errno.load(std::memory_order_relaxed));
+        }
+    }
+
+    mutable std::mutex m_cb_mutex;
+    error_callback_t   m_error_callback;
+    std::atomic<bool>  m_error_active{false};
+    std::atomic<bool>  m_error_pending{false};
+    std::atomic<int>   m_last_error{static_cast<int>(Error::NotOpen)};
+    std::atomic<int>   m_last_errno{0};
 
     int m_default_read_timeout_ms{200};  // read()/transact() 不传超时时的默认值
     int m_write_timeout_ms{500};         // 写等可写的最长时间

@@ -22,6 +22,38 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
+# 导出 compile_commands.json（写到各自的 build/<preset>/ 目录）：
+# 编辑器的 C/C++ IntelliSense（VSCode cpptools / clangd）不读 CMakeLists，只认这个编译
+# 数据库——没有它，第三方的 acl.h / hi_mpi_*.h 这些工程外的头文件一律标红波浪线。
+# 见 .vscode/c_cpp_properties.json 与 .vscode/settings.json 里的指向。
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+option(UAV_GATEWAY "构建 HTTP / WebSocket Gateway" ON)
+option(UAV_GATEWAY_ONLY "仅构建 Gateway，不查找板端媒体和国标依赖" OFF)
+option(UAV_GATEWAY_TESTS "构建并注册 Gateway 主机集成测试" OFF)
+option(UAV_RTSP_ONLY "仅构建 RTSP，不查找板端和 SIP 依赖" OFF)
+option(UAV_RTSP_TESTS "构建并注册 RTSP 主机回归测试" OFF)
+if(CMAKE_CROSSCOMPILING)
+  list(APPEND CMAKE_FIND_ROOT_PATH "${PROJECT_SOURCE_DIR}/third_party/openssl")
+endif()
+if(UAV_GATEWAY_TESTS OR UAV_RTSP_TESTS)
+  enable_testing()
+endif()
+if(UAV_GATEWAY)
+  add_subdirectory(src/gateway)
+endif()
+if(UAV_GATEWAY_ONLY)
+  if(NOT UAV_GATEWAY)
+    message(FATAL_ERROR "UAV_GATEWAY_ONLY requires UAV_GATEWAY=ON")
+  endif()
+  return()
+endif()
+if(UAV_RTSP_ONLY OR UAV_RTSP_TESTS)
+  add_subdirectory(src/rtsp)
+endif()
+if(UAV_RTSP_ONLY)
+  return()
+endif()
 
 list(APPEND CMAKE_FIND_ROOT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/third_party/boost)
 list(APPEND CMAKE_FIND_ROOT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/third_party/openssl)
@@ -92,8 +124,9 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 if(UAV_ASCEND)
   find_package(Ascend REQUIRED)
   message(STATUS "昇腾编译环境: ${ASCEND_HOME} (架构目录 ${ASCEND_ARCH_DIR}, 版本 ${ASCEND_VERSION})")
-  message(STATUS "  ACL 头文件: ${ASCEND_INCLUDE_DIR}")
+  message(STATUS "  ACL 头文件: ${ASCEND_INCLUDE_DIRS}")
   message(STATUS "  ACL 库    : ${ASCEND_ACL_LIBRARY}")
+  message(STATUS "  媒体库    : ${ASCEND_MEDIA_LIBRARIES}")
 else()
   message(STATUS "昇腾编译环境: 未启用 (UAV_ASCEND=OFF)")
 endif()
@@ -129,6 +162,17 @@ if(UAV_GB28181)
     src/gb28181/gb28181device.cpp)
 endif()
 
+# 依赖昇腾头文件/库的源文件：只有 UAV_ASCEND=ON 时才参与编译。否则 acl.h / hi_mpi_*.h
+# 根本不在 include 路径里，native（UAV_ASCEND=OFF）预设会直接编译失败。
+# 与下面 UAV_GB28181_SOURCES 是同一套处理方式。
+set(UAV_ASCEND_SOURCES "")
+if(UAV_ASCEND)
+  set(UAV_ASCEND_SOURCES
+    src/camera/mipi_ctl.cpp          # MIPI/DVPP 采集链路（acl.h + hi_mpi_*/hi_dvpp.h）
+    src/camera/rgb_camera_ctl.cpp    # 可见光相机总控（串口控制 + 整条出图链路编排）
+  )
+endif()
+
 # 注意：新增模块的 .cpp 必须显式列在这里（旧版本漏掉整个 log 模块，
 # 导致日志代码从未被编译、里面的编译错误一直没被发现）
 set(UAV_SOURCES
@@ -139,6 +183,10 @@ set(UAV_SOURCES
   src/rtsp/rtp_source.cpp
   src/rtsp/rtp_transport.cpp
   src/rtsp/file_source.cpp
+  src/rtsp/h264_access_unit.cpp
+  src/camera/shihui_protocol.cpp   # 世辉相机串口控制协议（依赖 common/urt.h）
+  src/camera/rgb_camera.cpp        # 可见光相机控制封装（工程值 ↔ 协议值换算）
+  ${UAV_ASCEND_SOURCES}
   ${UAV_GB28181_SOURCES}
 )
 
@@ -148,6 +196,10 @@ add_executable(uav_detection
 
 
 target_include_directories(uav_detection PRIVATE src)
+if(UAV_GATEWAY)
+  target_link_libraries(uav_detection PRIVATE uav_gateway_lib)
+  target_compile_definitions(uav_detection PRIVATE UAV_HAS_GATEWAY=1)
+endif()
 target_link_libraries(uav_detection PRIVATE
   Boost::headers                 # header-only（asio/beast/json…）
   Boost::thread
@@ -163,8 +215,18 @@ if(UAV_GB28181)
 endif()
 
 if(UAV_ASCEND)
-  # ACL 运行时（acl/*.h + libascendcl）。当前代码尚未调用 ACL 符号，链接器
-  # （--as-needed）不会把它写进 NEEDED；接入 detect 等模块后自动成为真实依赖。
-  # 板卡上运行时需要先 source CANN 的 setenv.bash（或用 LD_LIBRARY_PATH）加载 libascendcl。
-  target_link_libraries(uav_detection PRIVATE Ascend::ascendcl)
+  # main.cpp 用这个宏决定要不要编采集链路：它依赖海思头文件，而 main.cpp 在公共
+  # UAV_SOURCES 里（native 预设也会编它），所以必须靠宏隔离，否则 UAV_ASCEND=OFF 时编不过。
+  target_compile_definitions(uav_detection PRIVATE UAV_HAS_ASCEND=1)
+
+  # ACL 运行时 + DVPP/媒体 MPI 库（Ascend::ascend_media = libascendcl + libacl_dvpp[_mpi]
+  # + libacl_vi_mpi + libacl_vpss_mpi + libacl_vo_mpi + libacl_hdmi_mpi + libacl_isp_* 等，
+  # 头文件里声明的 hi_mpi_sys_* / hi_mpi_vpss_* / hi_mpi_vi_* 等符号就来自这些库；
+  # 头文件 ↔ 库 的对应关系与查证方法见 cmake/FindAscend.cmake 顶部注释）。
+  # 这些是共享库，链接器 --as-needed 不会把尚未调用的库写进 NEEDED —— 所以现在就链上
+  # 没有副作用，接入 detect / mipi_ctl 等模块后会自然成为真实依赖；也可以只链需要的那个
+  # （如 Ascend::acl_vi_mpi）。
+  # 板卡上运行时需要这些 .so 在库搜索路径里：先 source CANN 的 setenv.bash，或自行设置
+  # LD_LIBRARY_PATH；注意板卡侧的 .so 版本可能与编译期用的 CANN 版本不完全一致。
+  target_link_libraries(uav_detection PRIVATE Ascend::ascend_media)
 endif()

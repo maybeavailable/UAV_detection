@@ -241,6 +241,68 @@ int main()
     CHECK(urt.open("/dev/definitely-not-exist-urt", 115200) == -1, "不存在的设备 → 失败");
     CHECK(urt.open(slaveName, 12345) == -1, "不支持的波特率 → 失败");
 
+    // ---------------- 8b. 链路异常回调 ----------------
+    {
+        int master2 = -1;
+        std::string slave2;
+        if (makePty(master2, slave2))
+        {
+            Urt u;
+            std::atomic<int> cb_count{0};
+            std::atomic<int> cb_errno{0};
+            std::atomic<int> last_err{ -1 };
+            u.set_error_callback([&](Urt::Error err, int sys_errno) {
+                last_err = static_cast<int>(err);
+                cb_errno = sys_errno;
+                cb_count++;
+            });
+
+            // (1) 未打开就调用 read → NotOpen，应触发一次回调
+            std::uint8_t buf[16] = {0};
+            CHECK(u.read(buf, sizeof(buf), 50) == -1, "未打开时 read 返回 -1");
+            CHECK(cb_count.load() == 1, "链路异常回调被触发(未打开)");
+            CHECK(last_err.load() == static_cast<int>(Urt::Error::NotOpen), "异常类型为 NotOpen");
+            CHECK(u.has_error(), "has_error() = true");
+
+            // (2) 沿触发：连续多次失败不应重复回调
+            u.read(buf, sizeof(buf), 50);
+            u.read(buf, sizeof(buf), 50);
+            CHECK(cb_count.load() == 1, "异常状态持续时回调不重复触发(沿触发)");
+
+            // (3) 打开后读写成功 → 恢复，重新武装回调
+            CHECK(u.open(slave2, 115200, 8, 'N', 1, false, false) == 0, "重新打开串口");
+            CHECK(u.write(buf, 4) == 4, "写入成功");
+            ::read(master2, buf, sizeof(buf));          // 取走，保持缓冲干净
+            CHECK(!u.has_error(), "读到/写到数据后 has_error() 复位(链路恢复)");
+
+            u.read(buf, sizeof(buf), 50);
+            CHECK(cb_count.load() == 1, "恢复后正常读超时不触发回调(超时不算异常)");
+
+            // (4) 拔线：关闭对端 master → 从端读到 EOF/EIO，应触发链路断开回调
+            ::close(master2);
+            CHECK(u.start_receive([](const std::uint8_t *, std::size_t) {}) == 0,
+                  "启动接收线程(用于捕捉拔线)");
+            for (int i = 0; i < 60 && cb_count.load() < 2; i++)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(25));
+            }
+            CHECK(cb_count.load() == 2, "对端断开后异常回调被触发(接收线程内发现)");
+            const int err = last_err.load();
+            CHECK(err == static_cast<int>(Urt::Error::PeerClosed) ||
+                  err == static_cast<int>(Urt::Error::ReadFailed),
+                  "异常类型为 PeerClosed 或 ReadFailed");
+            CHECK(u.has_error(), "拔线后 has_error() = true");
+
+            // (5) 拔线后回调不刷屏：再等一会不应重复触发
+            const int before = cb_count.load();
+            std::this_thread::sleep_for(std::chrono::milliseconds(300));
+            CHECK(cb_count.load() == before, "链路异常状态下回调不刷屏");
+
+            u.stop_receive();
+            u.close();
+        }
+    }
+
     // ---------------- 9. 独占保护（TIOCEXCL）----------------
     // 单独用一对 pty：内核里 TIOCEXCL 标志只要 tty 还有引用就不会清除，
     // 所以独占测试不能和上面的反复 close/open 混用同一个 pty

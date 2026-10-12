@@ -3,6 +3,8 @@
 #include"rtsp/rtp_source.h"
 
 #include<string>
+#include<condition_variable>
+#include<mutex>
 #include<thread>
 #include<vector>
 
@@ -12,7 +14,7 @@
 // encode 模块就绪后：让真实源继承 RtpSource，产出 H.264 帧后调用 pushFrame 即可。
 //
 // 示例（ffmpeg 生成测试文件）：
-//   ffmpeg -f lavfi -i testsrc=duration=3:size=640x360:rate=25 -c:v libx264 -pix_fmt yuv420p -f h264 test.h264
+//   ffmpeg -f lavfi -i testsrc=duration=3:size=640x360:rate=25 -c:v libx264 -bf 0 -pix_fmt yuv420p -f h264 test.h264
 class FileRtpSource : public RtpSource
 {
 public:
@@ -29,6 +31,8 @@ private:
     std::string m_filePath_;
     double      m_fps_;
 
+    std::mutex m_sleepMutex_;
+    std::condition_variable m_wake_;
     std::thread       m_thread_;
     std::atomic<bool> m_stop_{false};
 };
