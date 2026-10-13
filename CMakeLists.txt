@@ -180,6 +180,12 @@ set(UAV_SOURCES
   src/main.cpp
   src/log/log.cpp
   src/log/RotateFileWriter.cpp
+  src/common/udp_socket.cpp      # 通用 Asio UDP 数据报收发（MoQ / WebRTC）
+  src/webrtc/ice_candidate.cpp   # ICE 候选 SDP 与优先级
+  src/webrtc/sdp.cpp             # WebRTC SDP 会话/媒体描述解析与生成
+  src/webrtc/stun_protocol.cpp   # STUN Binding / ICE 属性及完整性校验
+  src/webrtc/ice_agent.cpp       # UDP ICE 候选收集、连通性检查、提名与 consent
+  src/webrtc/ice_transport.cpp   # WebRTC ICE 传输、报文分流与 DTLS 接入参数
   src/rtsp/rtspserver.cpp
   src/rtsp/rtp_source.cpp
   src/rtsp/rtp_transport.cpp
