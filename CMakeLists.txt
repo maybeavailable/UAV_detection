@@ -185,6 +185,7 @@ set(UAV_SOURCES
   src/rtsp/rtp_transport.cpp
   src/rtsp/file_source.cpp
   src/rtsp/h264_access_unit.cpp
+  src/ptz/ptz_protocol.cpp        # 转台 Pelco-D 及扩展控制协议
   src/camera/shihui_protocol.cpp   # 世辉相机串口控制协议（依赖 common/urt.h）
   src/camera/airui_protocol.cpp    # 艾睿 F384/F640 热成像串口协议
   src/camera/rgb_camera.cpp        # 可见光相机控制封装（工程值 ↔ 协议值换算）
