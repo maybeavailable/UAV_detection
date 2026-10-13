@@ -473,19 +473,19 @@ private:
         case 'e':
             tty.c_cflag |= PARENB;
             tty.c_cflag &= ~PARODD;
-            tty.c_cflag |= INPCK;
+            tty.c_iflag |= INPCK;
             break;
         case 'O':
         case 'o':
             tty.c_cflag |= PARENB;
             tty.c_cflag |= PARODD;
-            tty.c_cflag |= INPCK;
+            tty.c_iflag |= INPCK;
             break;
         case 'N':
         case 'n':
         default:
             tty.c_cflag &= ~PARENB;
-            tty.c_cflag &= ~INPCK;
+            tty.c_iflag &= ~INPCK;
             break;
         }
 

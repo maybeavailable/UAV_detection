@@ -170,6 +170,7 @@ if(UAV_ASCEND)
   set(UAV_ASCEND_SOURCES
     src/camera/mipi_ctl.cpp          # MIPI/DVPP 采集链路（acl.h + hi_mpi_*/hi_dvpp.h）
     src/camera/rgb_camera_ctl.cpp    # 可见光相机总控（串口控制 + 整条出图链路编排）
+    src/camera/thermal_camera_ctl.cpp # 热成像单通道 640x512 采集和串口控制
   )
 endif()
 
@@ -185,7 +186,9 @@ set(UAV_SOURCES
   src/rtsp/file_source.cpp
   src/rtsp/h264_access_unit.cpp
   src/camera/shihui_protocol.cpp   # 世辉相机串口控制协议（依赖 common/urt.h）
+  src/camera/airui_protocol.cpp    # 艾睿 F384/F640 热成像串口协议
   src/camera/rgb_camera.cpp        # 可见光相机控制封装（工程值 ↔ 协议值换算）
+  src/camera/thermal_camera.cpp    # 热成像相机业务控制封装（艾睿协议）
   ${UAV_ASCEND_SOURCES}
   ${UAV_GB28181_SOURCES}
 )

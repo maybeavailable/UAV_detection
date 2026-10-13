@@ -1,12 +1,16 @@
 #include"log/log.h"
 
 #include<atomic>
+#include<charconv>
 #include<chrono>
 #include<csignal>
 #include<cstdlib>
+#include<fstream>
+#include<functional>
 #include<iostream>
 #include<optional>
 #include<string>
+#include<thread>
 
 #if defined(UAV_HAS_GATEWAY)
 #include"gateway/gateway.h"
@@ -14,32 +18,32 @@
 
 #if defined(UAV_HAS_ASCEND)
 #include"camera/rgb_camera_ctl.h"
+#include"camera/thermal_camera_ctl.h"
 #endif
 
 // ===========================================================================
 // UAV_detection 主程序
 //
-// 当前阶段：把可见光相机的采集链路跑起来，并确认**能抓到图**。
+// 当前阶段：同时测试可见光和热成像出图。
 //   世辉相机 ─MIPI─▶ MIPI RX ─▶ VI ─▶ VPSS ─┬─ chn0 2688x1520（主）
 //                                            └─ chn1 1920x1080（子）
+//   艾睿热成像 ─MIPI─▶ MIPI RX ─▶ VI ─▶ VPSS ── chn0 640x512
 // 设置 UAV_GATEWAY_TOKEN 时启用 HTTP/WS 状态与控制接口（见 docs/gateway.md）。
 // 编码（VENC）、RTSP/GB28181 推流都还没接。
 //
 // 运行（板卡上）：
 //   source /usr/local/Ascend/ascend-toolkit/set_env.sh
-//   ./bin/uav_detection
+//   ./bin/uav_detection --duration 15    # 采集 15 秒；不带参数则 Ctrl+C 结束
 // 抓到的第一帧会写到当前目录，直接能看：
 //   ffplay -f rawvideo -pixel_format nv21 -video_size 2688x1520 main_2688x1520.yuv
 //   ffplay -f rawvideo -pixel_format nv21 -video_size 1920x1080 sub_1920x1080.yuv
+//   ffplay -f rawvideo -pixel_format nv21 -video_size 640x512 thermal_640x512.yuv
 //
 // Ctrl+C 退出：会先拆链路再退（否则 VI/VPSS 会留在半开状态）。
 // ===========================================================================
 
 namespace
 {
-// 抓图循环：0 = 一直抓（Ctrl+C 退出）；改成 N 就抓 N 帧后自动退出
-constexpr int kGrabCount = 0;
-
 std::atomic<bool> g_stop{false};
 
 void onSignal(int)
@@ -48,6 +52,41 @@ void onSignal(int)
 }
 
 #if defined(UAV_HAS_ASCEND)
+// 声明在控制器之前，确保相机和采集线程退出后才销毁公共媒体资源。
+class MediaRuntime
+{
+public:
+    bool init()
+    {
+        if (!check(aclInit(nullptr), "aclInit")) return false;
+        aclReady_ = true;
+        if (!check(aclrtSetDevice(0), "aclrtSetDevice")) return false;
+        deviceReady_ = true;
+        if (!check(aclrtCreateContext(&context_, 0), "aclrtCreateContext")) return false;
+        if (!check(hi_mpi_sys_init(), "hi_mpi_sys_init")) return false;
+        sysReady_ = true;
+        // 与 8.11/VT vi_visible_start() 一致；只在两台相机启动前设置一次。
+        return check(mipi_ctl::vi_set_mipi_hs_mode(LANE_DIVIDE_MODE_1), "MIPI lane divide mode");
+    }
+    ~MediaRuntime()
+    {
+        if (sysReady_) check(hi_mpi_sys_exit(), "hi_mpi_sys_exit");
+        if (context_) check(aclrtDestroyContext(context_), "aclrtDestroyContext");
+        if (deviceReady_) check(aclrtResetDevice(0), "aclrtResetDevice");
+        if (aclReady_) check(aclFinalize(), "aclFinalize");
+    }
+    aclrtContext context() const { return context_; }
+private:
+    static bool check(int result, const char* operation)
+    {
+        if (result == 0) return true;
+        UAV_LOG_ERROR_F("%s 失败：%#x", operation, static_cast<unsigned>(result));
+        return false;
+    }
+    aclrtContext context_ = nullptr;
+    bool aclReady_ = false, deviceReady_ = false, sysReady_ = false;
+};
+
 // 打印一帧的关键信息（frame 只在回调期间有效，别存下来）
 void logFrame(const char *tag, const hi_video_frame_info &frameInfo)
 {
@@ -59,6 +98,113 @@ void logFrame(const char *tag, const hi_video_frame_info &frameInfo)
                    static_cast<unsigned long long>(f.phys_addr[0]),
                    static_cast<unsigned long long>(f.pts));
 }
+
+// 保存 getFrame 回调中的同一帧，不再额外取一帧；回调返回前完成文件写入。
+bool saveSample(const char* path, const hi_video_frame& frame)
+{
+    if (!frame.virt_addr[0] || !frame.virt_addr[1] ||
+        frame.width_stride[0] < frame.width || frame.width_stride[1] < frame.width)
+        return false;
+    std::ofstream output(path, std::ios::binary | std::ios::trunc);
+    if (!output) return false;
+    for (unsigned plane = 0; plane < 2; ++plane)
+    {
+        const auto* data = static_cast<const char*>(frame.virt_addr[plane]);
+        const auto rows = plane == 0 ? frame.height : frame.height / 2;
+        for (hi_u32 row = 0; row < rows; ++row)
+        {
+            output.write(data + static_cast<std::size_t>(row) * frame.width_stride[plane], frame.width);
+            if (!output) return false;
+        }
+    }
+    output.close();
+    return output.good();
+}
+
+struct CaptureProbe
+{
+    const char* name;
+    const char* samplePath;
+    hi_u32 width, height;
+    std::atomic<std::uint64_t> frames{0}, errors{0}, lastPtsUs{0};
+    std::atomic<bool> saved{false}, running{false};
+    std::uint64_t lastCount = 0; // 仅主线程读取和更新
+    std::thread worker;
+
+    CaptureProbe(const char* label, const char* path, hi_u32 w, hi_u32 h)
+        : name(label), samplePath(path), width(w), height(h) {}
+    ~CaptureProbe() { g_stop.store(true); join(); }
+    void join() { if (worker.joinable()) worker.join(); }
+    bool passed() const { return frames.load() > 0 && saved.load(); }
+
+    void start(aclrtContext context,
+               std::function<bool(RGBCameraCtl::FrameHandler, int)> grab)
+    {
+        running.store(true);
+        worker = std::thread([this, context, grab = std::move(grab)] {
+            const auto result = aclrtSetCurrentContext(context);
+            if (result != ACL_SUCCESS)
+            {
+                ++errors;
+                UAV_LOG_ERROR_F("%s：设置采集线程 context 失败：%d", name, result);
+                running.store(false);
+                return;
+            }
+            bool seen = false, sampleAttempted = false;
+            try
+            {
+                while (!g_stop.load())
+                {
+                    bool valid = false;
+                    const bool got = grab([&](const hi_video_frame_info& info) {
+                        const auto& frame = info.v_frame;
+                        if (!seen) logFrame(name, info);
+                        valid = frame.width == width && frame.height == height &&
+                            frame.pixel_format == HI_PIXEL_FORMAT_YVU_SEMIPLANAR_420 &&
+                            frame.compress_mode == HI_COMPRESS_MODE_NONE &&
+                            frame.video_format == HI_VIDEO_FORMAT_LINEAR;
+                        if (!seen && !valid)
+                            UAV_LOG_ERROR_F("%s：帧格式与预期 %ux%u NV21 不符", name, width, height);
+                        seen = true;
+                        if (!valid) return;
+                        lastPtsUs.store(frame.pts);
+                        if (!sampleAttempted)
+                        {
+                            sampleAttempted = true;
+                            saved.store(saveSample(samplePath, frame));
+                            if (saved.load()) UAV_LOG_INFO_F("%s：首帧已保存至 %s", name, samplePath);
+                            else UAV_LOG_ERROR_F("%s：首帧保存失败：%s", name, samplePath);
+                        }
+                    }, 200); // 一路离线不会阻塞其它通道，退出时最多等待本次超时
+                    if (got && valid) ++frames;
+                    else ++errors;
+                    if (!got) std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                }
+            }
+            catch (const std::exception& error)
+            {
+                ++errors;
+                UAV_LOG_ERROR_F("%s：采集线程异常：%s", name, error.what());
+            }
+            catch (...)
+            {
+                ++errors;
+                UAV_LOG_ERROR_F("%s：采集线程发生未知异常", name);
+            }
+            running.store(false);
+        });
+    }
+    void logStats(double elapsedSeconds)
+    {
+        const auto count = frames.load();
+        UAV_LOG_INFO_F("%s：%.1f fps，累计 %llu 帧，失败 %llu 次，pts=%llu，样帧=%s", name,
+                       (count - lastCount) / elapsedSeconds,
+                       static_cast<unsigned long long>(count),
+                       static_cast<unsigned long long>(errors.load()),
+                       static_cast<unsigned long long>(lastPtsUs.load()), saved.load() ? "已保存" : "未保存");
+        lastCount = count;
+    }
+};
 #endif
 }   // namespace
 
@@ -74,22 +220,39 @@ int main(int argc, char **argv)
     if (argc > 1 && std::string(argv[1]) == "--gateway-only")
         return uav::gateway::runStandalone(argc - 1, argv + 1);
 #endif
-    if (argc > 1)
+    int durationSeconds = 0;
+    for (int i = 1; i < argc; ++i)
     {
-        if (std::string(argv[1]) == "--help")
+        const std::string argument(argv[i]);
+        if (argument == "--help")
         {
-            std::cout << "Usage: uav_detection [--gateway-only [--bind ADDRESS] [--port PORT] [--config FILE]]\n"
+            std::cout << "Usage: uav_detection [--duration SECONDS]\n"
+                         "  Capture RGB main/sub and thermal; 0 seconds (default) runs until Ctrl+C.\n"
+                         "  Save first NV21 frames: main_2688x1520.yuv, sub_1920x1080.yuv, thermal_640x512.yuv.\n"
+                         "  uav_detection --gateway-only [--bind ADDRESS] [--port PORT] [--config FILE]\n"
                          "  Gateway options: --state-file FILE --web-root DIRECTORY --tls-cert FILE --tls-key FILE\n"
                          "Set UAV_GATEWAY_TOKEN to enable Gateway alongside board camera capture.\n";
             return 0;
         }
-        UAV_LOG_ERROR << "未知参数：" << argv[1];
+        if (argument == "--duration" && i + 1 < argc)
+        {
+            const std::string value(argv[++i]);
+            int seconds = 0;
+            const auto parsed = std::from_chars(value.data(), value.data() + value.size(), seconds);
+            if (parsed.ec == std::errc{} && parsed.ptr == value.data() + value.size() && seconds >= 0)
+            {
+                durationSeconds = seconds;
+                continue;
+            }
+        }
+        UAV_LOG_ERROR << "参数无效：" << argument << "；使用 --help 查看用法";
         return 2;
     }
 
     UAV_LOG_INFO << "================ UAV_detection 启动 ================";
 
 #if !defined(UAV_HAS_ASCEND)
+    (void)durationSeconds;
 #if defined(UAV_HAS_GATEWAY)
     if (const char *token = std::getenv("UAV_GATEWAY_TOKEN"); token && *token)
         return uav::gateway::runStandalone(argc, argv);
@@ -102,35 +265,30 @@ int main(int argc, char **argv)
     std::signal(SIGINT, onSignal);
     std::signal(SIGTERM, onSignal);
 
-    // ---- 1. 建链路 -------------------------------------------------------
+    // ---- 1. 公共媒体环境与两台相机 ---------------------------------------
+    MediaRuntime media;
+    if (!media.init()) return 1;
     RGBCameraCtl ctl;
+    ThermalCameraCtl thermal;
     RGBCameraCtl::Config cfg;   // 默认值即 8.11 __MIPI__ 那套：
                                 // 2688x1520@50 MIPI dev0 / vi pipe2 chn0 / vpss grp256 chn0+chn1
-    if (!ctl.init(cfg))
-    {
-        UAV_LOG_ERROR << "相机链路初始化失败，退出";
-        return -1;
-    }
-    UAV_LOG_INFO_F("链路已就绪：相机串口 %s（%s）\n",
+    ThermalCameraCtl::Config thermalCfg;
+    const bool rgbReady = ctl.init(cfg);
+    const bool thermalReady = thermal.init(thermalCfg);
+    if (!rgbReady) UAV_LOG_ERROR << "可见光链路初始化失败，继续检查热成像";
+    if (!thermalReady) UAV_LOG_ERROR << "热成像链路初始化失败，继续检查可见光";
+    if (!rgbReady && !thermalReady) return 1;
+    UAV_LOG_INFO_F("可见光：链路=%s，串口 %s（%s）\n", rgbReady ? "就绪" : "失败",
                    cfg.cameraPort.c_str(),
                    ctl.cameraConnected() ? "已连接，参数可调" : "未连接，只能抓图");
+    UAV_LOG_INFO_F("热成像：链路=%s，串口 %s（%s）\n", thermalReady ? "就绪" : "失败",
+                   thermalCfg.camera.port.c_str(), thermal.cameraConnected() ? "已连接，参数可调" : "未连接，只能抓图");
 
-    // ---- 2. 两路各抓一帧，确认真的有图 ------------------------------------
-    if (ctl.getFrame(0, [](const hi_video_frame_info &f) { logFrame("主通道第一帧", f); }))
-    {
-        ctl.saveFrame(0, "main_2688x1520.yuv");
-    }
-    else
-    {
-        UAV_LOG_ERROR << "主通道没抓到帧（检查顺序：相机是否在出图 → MIPI 接线与 lane 数 → "
-                         "vi pipe2 / vpss grp256 是否与硬件对得上）";
-    }
-
-    if (cfg.vpssChnCfg[1].enable &&
-        ctl.getFrame(1, [](const hi_video_frame_info &f) { logFrame("子通道第一帧", f); }))
-    {
-        ctl.saveFrame(1, "sub_1920x1080.yuv");
-    }
+    CaptureProbe rgbMain("可见光主通道", "main_2688x1520.yuv", cfg.width, cfg.height);
+    CaptureProbe rgbSub("可见光子通道", "sub_1920x1080.yuv",
+                        cfg.vpssChnCfg[1].width ? cfg.vpssChnCfg[1].width : cfg.width,
+                        cfg.vpssChnCfg[1].height ? cfg.vpssChnCfg[1].height : cfg.height);
+    CaptureProbe thermalMain("热成像", "thermal_640x512.yuv", thermalCfg.width, thermalCfg.height);
 
 #if defined(UAV_HAS_GATEWAY)
     // 设置 Token 时启用网页接入。独立诊断采集仍可在未设置 Token 时运行。
@@ -138,9 +296,13 @@ int main(int argc, char **argv)
     auto updateGatewayStatus = [&] {
         if (!gateway) return;
         const auto s = ctl.stats();
-        gateway->updateDeviceStatus("rgb", {{"state", "capturing"},
+        gateway->updateDeviceStatus("rgb", {{"state", rgbReady ? (rgbMain.frames.load() > 0 ? "capturing" : "waiting_frames") : "init_failed"},
             {"camera_control_connected", ctl.cameraConnected()}, {"frames", s.frames},
             {"errors", s.errors}, {"last_pts_us", s.lastPtsUs}});
+        const auto t = thermal.stats();
+        gateway->updateDeviceStatus("thermal", {{"state", thermalReady ? (thermalMain.frames.load() > 0 ? "capturing" : "waiting_frames") : "init_failed"},
+            {"camera_control_connected", thermal.cameraConnected()}, {"frames", t.frames},
+            {"errors", t.errors}, {"last_pts_us", t.lastPtsUs}});
     };
     if (const char *token = std::getenv("UAV_GATEWAY_TOKEN"); token && *token)
     {
@@ -180,6 +342,13 @@ int main(int argc, char **argv)
                         {{"device_confirmed", false}}, uav::gateway::CommandCompletion::dispatched};
                 });
             gateway->registerStream({"rgb.main", "rgb", "h264", {"webrtc", "rtsp", "gb28181"}}, {});
+            uav::gateway::Device thermalDevice;
+            thermalDevice.id = "thermal";
+            thermalDevice.type = "camera";
+            thermalDevice.name = "Thermal camera";
+            thermalDevice.config = {{"serial_port", thermalCfg.camera.port},
+                {"width", thermalCfg.width}, {"height", thermalCfg.height}};
+            gateway->registerDevice(std::move(thermalDevice));
             if (const char *file = std::getenv("UAV_GATEWAY_CONFIG")) uav::gateway::loadRegistry(*gateway, file);
             updateGatewayStatus();
             gateway->start();
@@ -193,59 +362,68 @@ int main(int argc, char **argv)
     }
 #endif
 
-    // ---- 3. 连续抓图，每秒打一次统计（Ctrl+C 退出）-------------------------
-    if (kGrabCount > 0)
+    // ---- 2. 独立采集线程，每路首次出图时保存样帧 -------------------------
+    try
     {
-        UAV_LOG_INFO_F("开始抓图：抓满 %d 帧后退出\n", kGrabCount);
+        if (rgbReady)
+        {
+            rgbMain.start(media.context(), [&ctl](auto handler, int timeout) { return ctl.getFrame(0, std::move(handler), timeout); });
+            if (cfg.vpssChnCfg[1].enable)
+                rgbSub.start(media.context(), [&ctl](auto handler, int timeout) { return ctl.getFrame(1, std::move(handler), timeout); });
+        }
+        if (thermalReady)
+            thermalMain.start(media.context(), [&thermal](auto handler, int timeout) { return thermal.getFrame(std::move(handler), timeout); });
     }
-    else
+    catch (const std::exception& error)
     {
-        UAV_LOG_INFO << "开始连续抓图（Ctrl+C 退出）";
+        UAV_LOG_ERROR << "无法启动采集线程：" << error.what();
+        g_stop.store(true);
     }
+    const auto started = std::chrono::steady_clock::now();
+    auto lastLog = started;
+    if (durationSeconds > 0) UAV_LOG_INFO_F("开始双相机出图测试，%d 秒后结束", durationSeconds);
+    else UAV_LOG_INFO << "开始双相机连续出图测试（Ctrl+C 结束）";
 
-    uint64_t grabbed   = 0;
-    uint64_t lastCount = 0;
-    auto     lastLog   = std::chrono::steady_clock::now();
-
+    // ---- 3. 监控每路实际帧率，定时结束或等待 Ctrl+C -----------------------
     while (!g_stop.load())
     {
-        if (ctl.getFrame(0, [](const hi_video_frame_info &) {}))
-        {
-            ++grabbed;
-        }
-
-        if (kGrabCount > 0 && grabbed >= static_cast<uint64_t>(kGrabCount))
-        {
-            break;
-        }
-
         const auto now = std::chrono::steady_clock::now();
         if (now - lastLog >= std::chrono::seconds(1))
         {
-            const RGBCameraCtl::Stats s = ctl.stats();
-            UAV_LOG_INFO_F("抓图统计：本秒 %llu 帧，累计 %llu 帧，失败 %llu 次，最后一帧 pts=%llu\n",
-                           static_cast<unsigned long long>(grabbed - lastCount),
-                           static_cast<unsigned long long>(s.frames),
-                           static_cast<unsigned long long>(s.errors),
-                           static_cast<unsigned long long>(s.lastPtsUs));
-            lastLog   = now;
-            lastCount = grabbed;
+            const double elapsed = std::chrono::duration<double>(now - lastLog).count();
+            rgbMain.logStats(elapsed);
+            if (cfg.vpssChnCfg[1].enable) rgbSub.logStats(elapsed);
+            thermalMain.logStats(elapsed);
+            lastLog = now;
 #if defined(UAV_HAS_GATEWAY)
             updateGatewayStatus();
 #endif
         }
+        if (durationSeconds > 0 && now - started >= std::chrono::seconds(durationSeconds)) break;
+        if (!rgbMain.running.load() && !rgbSub.running.load() && !thermalMain.running.load()) break;
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
-    // ---- 4. 拆链路 -------------------------------------------------------
+    // ---- 4. 先停止所有使用方，再逆序拆链路 -------------------------------
     // 析构里也会 deinit，这里显式调一次是为了日志顺序清楚
 #if defined(UAV_HAS_GATEWAY)
     // 先等待所有设备命令完成，保证 handler 不会访问已经拆除的 ctl。
     if (gateway) gateway->stop();
 #endif
+    g_stop.store(true);
+    rgbMain.join();
+    rgbSub.join();
+    thermalMain.join();
+    const bool rgbPassed = rgbReady && rgbMain.passed() && (!cfg.vpssChnCfg[1].enable || rgbSub.passed());
+    const bool thermalPassed = thermalReady && thermalMain.passed();
+    UAV_LOG_INFO_F("出图测试结果：可见光=%s（主 %llu 帧，子 %llu 帧），热成像=%s（%llu 帧）",
+                   rgbPassed ? "通过" : "失败", static_cast<unsigned long long>(rgbMain.frames.load()),
+                   static_cast<unsigned long long>(rgbSub.frames.load()), thermalPassed ? "通过" : "失败",
+                   static_cast<unsigned long long>(thermalMain.frames.load()));
+    thermal.deinit();
     ctl.deinit();
 
-    UAV_LOG_INFO_F("退出：共抓到 %llu 帧\n", static_cast<unsigned long long>(grabbed));
     UAV_LOG_INFO << "================ UAV_detection 退出 ================";
-    return 0;
+    return rgbPassed && thermalPassed ? 0 : 1;
 #endif
 }

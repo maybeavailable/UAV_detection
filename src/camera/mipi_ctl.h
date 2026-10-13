@@ -95,6 +95,7 @@ namespace mipi_ctl{
 
     hi_s32 vi_set_mipi_hs_mode(lane_divide_mode_t enHsMode);
     hi_s32 vi_enable_mipi_clock(combo_dev_t devno);
+    hi_s32 vi_disable_mipi_clock(combo_dev_t devno);
     hi_s32 vi_reset_mipi(combo_dev_t devno);
     hi_s32 vi_set_mipi_attr(combo_dev_attr_t stcomboDevAttr);
     hi_s32 vi_unreset_mipi(combo_dev_t devno);

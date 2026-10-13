@@ -153,6 +153,21 @@ hi_s32 mipi_ctl::vi_enable_mipi_clock(combo_dev_t devno)
     return s32Ret;
 }
 
+hi_s32 mipi_ctl::vi_disable_mipi_clock(combo_dev_t devno)
+{
+    const int fd = open(MIPI_DEV_NODE, O_RDWR);
+    if (fd < 0)
+    {
+        UAV_LOG_ERROR_F("open hi_mipi_rx dev failed");
+        return HI_FAILURE;
+    }
+    const hi_s32 ret = ioctl(fd, HI_MIPI_DISABLE_MIPI_CLOCK, &devno);
+    if (ret != HI_SUCCESS)
+        UAV_LOG_ERROR_F("MIPI_DISABLE_CLOCK %u failed: %#x", devno, static_cast<unsigned>(ret));
+    close(fd);
+    return ret;
+}
+
 hi_s32 mipi_ctl::vi_reset_mipi(combo_dev_t devno)
 {
         hi_s32              s32Ret = HI_SUCCESS;

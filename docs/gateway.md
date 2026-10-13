@@ -59,7 +59,7 @@ cmake --install build/gateway-native --prefix /opt/uav-gateway
 
 CLI 的 bind、port、config、state-file、web-root、tls-cert、tls-key 覆盖对应环境变量。单独使用 C++ Gateway 时，Config.stateFile 默认为空，应用可明确选择存储路径。
 
-板端使用 `cmake --preset ascend-aarch64` 与 `cmake --build --preset ascend-aarch64` 构建。设置管理员令牌后，正常运行 uav_detection 会同时启动 Gateway、登记真实 RGB 控制适配器并上报采集统计。Gateway 配置错误或绑定失败时记录错误并继续采集。独立 uav_gateway 启动失败仍返回非零退出码。
+板端使用 `cmake --preset ascend-aarch64` 与 `cmake --build --preset ascend-aarch64` 构建。设置管理员令牌后，正常运行 uav_detection 会同时启动 Gateway、登记真实 RGB 控制适配器，并上报 RGB 和热成像的采集统计。热成像在该入口只提供状态。双相机出图测试可通过 `--duration 15` 定时结束，详见 [测试说明](camera-capture-test.md)。Gateway 配置错误或绑定失败时记录错误并继续采集。独立 uav_gateway 启动失败仍返回非零退出码。
 
 ```bash
 # 板端：相机采集与 Gateway 一起运行
