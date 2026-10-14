@@ -1,0 +1,12 @@
+prefix=/home/huangquan/code/UAV_detection/third_party/usrsctp
+exec_prefix=/home/huangquan/code/UAV_detection/third_party/usrsctp
+libdir=/home/huangquan/code/UAV_detection/third_party/usrsctp/lib
+includedir=/home/huangquan/code/UAV_detection/third_party/usrsctp/include/usrsctp
+
+Name: usrsctp
+Description: SCTP implementation
+URL: https://github.com/sctplab/usrsctp
+Version: 0.9.5.0
+Requires: 
+Libs: -L${libdir} -lusrsctp
+Cflags: -I${includedir} 

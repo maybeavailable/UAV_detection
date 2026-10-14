@@ -85,6 +85,51 @@ rebuild_cache:
 rebuild_cache/fast: rebuild_cache
 .PHONY : rebuild_cache/fast
 
+# Special rule for the target list_install_components
+list_install_components:
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Available install components are: \"Unspecified\""
+.PHONY : list_install_components
+
+# Special rule for the target list_install_components
+list_install_components/fast: list_install_components
+.PHONY : list_install_components/fast
+
+# Special rule for the target install
+install: preinstall
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Install the project..."
+	/usr/bin/cmake -P cmake_install.cmake
+.PHONY : install
+
+# Special rule for the target install
+install/fast: preinstall/fast
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Install the project..."
+	/usr/bin/cmake -P cmake_install.cmake
+.PHONY : install/fast
+
+# Special rule for the target install/local
+install/local: preinstall
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Installing only the local directory..."
+	/usr/bin/cmake -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
+.PHONY : install/local
+
+# Special rule for the target install/local
+install/local/fast: preinstall/fast
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Installing only the local directory..."
+	/usr/bin/cmake -DCMAKE_INSTALL_LOCAL_ONLY=1 -P cmake_install.cmake
+.PHONY : install/local/fast
+
+# Special rule for the target install/strip
+install/strip: preinstall
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Installing the project stripped..."
+	/usr/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
+.PHONY : install/strip
+
+# Special rule for the target install/strip
+install/strip/fast: preinstall/fast
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Installing the project stripped..."
+	/usr/bin/cmake -DCMAKE_INSTALL_DO_STRIP=1 -P cmake_install.cmake
+.PHONY : install/strip/fast
+
 # The main all target
 all: cmake_check_build_system
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/huangquan/code/UAV_detection/CMakeFiles /home/huangquan/code/UAV_detection//CMakeFiles/progress.marks
@@ -128,6 +173,56 @@ uav_detection: cmake_check_build_system
 uav_detection/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/build
 .PHONY : uav_detection/fast
+
+#=============================================================================
+# Target rules for targets named uav_gateway_lib
+
+# Build rule for target.
+uav_gateway_lib: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 uav_gateway_lib
+.PHONY : uav_gateway_lib
+
+# fast build rule for target.
+uav_gateway_lib/fast:
+	$(MAKE) $(MAKESILENT) -f src/gateway/CMakeFiles/uav_gateway_lib.dir/build.make src/gateway/CMakeFiles/uav_gateway_lib.dir/build
+.PHONY : uav_gateway_lib/fast
+
+#=============================================================================
+# Target rules for targets named uav_gateway
+
+# Build rule for target.
+uav_gateway: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 uav_gateway
+.PHONY : uav_gateway
+
+# fast build rule for target.
+uav_gateway/fast:
+	$(MAKE) $(MAKESILENT) -f src/gateway/CMakeFiles/uav_gateway.dir/build.make src/gateway/CMakeFiles/uav_gateway.dir/build
+.PHONY : uav_gateway/fast
+
+src/camera/airui_protocol.o: src/camera/airui_protocol.cpp.o
+.PHONY : src/camera/airui_protocol.o
+
+# target to build an object file
+src/camera/airui_protocol.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/camera/airui_protocol.cpp.o
+.PHONY : src/camera/airui_protocol.cpp.o
+
+src/camera/airui_protocol.i: src/camera/airui_protocol.cpp.i
+.PHONY : src/camera/airui_protocol.i
+
+# target to preprocess a source file
+src/camera/airui_protocol.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/camera/airui_protocol.cpp.i
+.PHONY : src/camera/airui_protocol.cpp.i
+
+src/camera/airui_protocol.s: src/camera/airui_protocol.cpp.s
+.PHONY : src/camera/airui_protocol.s
+
+# target to generate assembly for a file
+src/camera/airui_protocol.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/camera/airui_protocol.cpp.s
+.PHONY : src/camera/airui_protocol.cpp.s
 
 src/camera/mipi_ctl.o: src/camera/mipi_ctl.cpp.o
 .PHONY : src/camera/mipi_ctl.o
@@ -224,6 +319,78 @@ src/camera/shihui_protocol.s: src/camera/shihui_protocol.cpp.s
 src/camera/shihui_protocol.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/camera/shihui_protocol.cpp.s
 .PHONY : src/camera/shihui_protocol.cpp.s
+
+src/camera/thermal_camera.o: src/camera/thermal_camera.cpp.o
+.PHONY : src/camera/thermal_camera.o
+
+# target to build an object file
+src/camera/thermal_camera.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/camera/thermal_camera.cpp.o
+.PHONY : src/camera/thermal_camera.cpp.o
+
+src/camera/thermal_camera.i: src/camera/thermal_camera.cpp.i
+.PHONY : src/camera/thermal_camera.i
+
+# target to preprocess a source file
+src/camera/thermal_camera.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/camera/thermal_camera.cpp.i
+.PHONY : src/camera/thermal_camera.cpp.i
+
+src/camera/thermal_camera.s: src/camera/thermal_camera.cpp.s
+.PHONY : src/camera/thermal_camera.s
+
+# target to generate assembly for a file
+src/camera/thermal_camera.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/camera/thermal_camera.cpp.s
+.PHONY : src/camera/thermal_camera.cpp.s
+
+src/camera/thermal_camera_ctl.o: src/camera/thermal_camera_ctl.cpp.o
+.PHONY : src/camera/thermal_camera_ctl.o
+
+# target to build an object file
+src/camera/thermal_camera_ctl.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/camera/thermal_camera_ctl.cpp.o
+.PHONY : src/camera/thermal_camera_ctl.cpp.o
+
+src/camera/thermal_camera_ctl.i: src/camera/thermal_camera_ctl.cpp.i
+.PHONY : src/camera/thermal_camera_ctl.i
+
+# target to preprocess a source file
+src/camera/thermal_camera_ctl.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/camera/thermal_camera_ctl.cpp.i
+.PHONY : src/camera/thermal_camera_ctl.cpp.i
+
+src/camera/thermal_camera_ctl.s: src/camera/thermal_camera_ctl.cpp.s
+.PHONY : src/camera/thermal_camera_ctl.s
+
+# target to generate assembly for a file
+src/camera/thermal_camera_ctl.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/camera/thermal_camera_ctl.cpp.s
+.PHONY : src/camera/thermal_camera_ctl.cpp.s
+
+src/common/udp_socket.o: src/common/udp_socket.cpp.o
+.PHONY : src/common/udp_socket.o
+
+# target to build an object file
+src/common/udp_socket.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/common/udp_socket.cpp.o
+.PHONY : src/common/udp_socket.cpp.o
+
+src/common/udp_socket.i: src/common/udp_socket.cpp.i
+.PHONY : src/common/udp_socket.i
+
+# target to preprocess a source file
+src/common/udp_socket.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/common/udp_socket.cpp.i
+.PHONY : src/common/udp_socket.cpp.i
+
+src/common/udp_socket.s: src/common/udp_socket.cpp.s
+.PHONY : src/common/udp_socket.s
+
+# target to generate assembly for a file
+src/common/udp_socket.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/common/udp_socket.cpp.s
+.PHONY : src/common/udp_socket.cpp.s
 
 src/gb28181/gb28181_media.o: src/gb28181/gb28181_media.cpp.o
 .PHONY : src/gb28181/gb28181_media.o
@@ -465,6 +632,30 @@ src/main.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/main.cpp.s
 .PHONY : src/main.cpp.s
 
+src/ptz/ptz_protocol.o: src/ptz/ptz_protocol.cpp.o
+.PHONY : src/ptz/ptz_protocol.o
+
+# target to build an object file
+src/ptz/ptz_protocol.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/ptz/ptz_protocol.cpp.o
+.PHONY : src/ptz/ptz_protocol.cpp.o
+
+src/ptz/ptz_protocol.i: src/ptz/ptz_protocol.cpp.i
+.PHONY : src/ptz/ptz_protocol.i
+
+# target to preprocess a source file
+src/ptz/ptz_protocol.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/ptz/ptz_protocol.cpp.i
+.PHONY : src/ptz/ptz_protocol.cpp.i
+
+src/ptz/ptz_protocol.s: src/ptz/ptz_protocol.cpp.s
+.PHONY : src/ptz/ptz_protocol.s
+
+# target to generate assembly for a file
+src/ptz/ptz_protocol.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/ptz/ptz_protocol.cpp.s
+.PHONY : src/ptz/ptz_protocol.cpp.s
+
 src/rtsp/file_source.o: src/rtsp/file_source.cpp.o
 .PHONY : src/rtsp/file_source.o
 
@@ -488,6 +679,30 @@ src/rtsp/file_source.s: src/rtsp/file_source.cpp.s
 src/rtsp/file_source.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/rtsp/file_source.cpp.s
 .PHONY : src/rtsp/file_source.cpp.s
+
+src/rtsp/h264_access_unit.o: src/rtsp/h264_access_unit.cpp.o
+.PHONY : src/rtsp/h264_access_unit.o
+
+# target to build an object file
+src/rtsp/h264_access_unit.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/rtsp/h264_access_unit.cpp.o
+.PHONY : src/rtsp/h264_access_unit.cpp.o
+
+src/rtsp/h264_access_unit.i: src/rtsp/h264_access_unit.cpp.i
+.PHONY : src/rtsp/h264_access_unit.i
+
+# target to preprocess a source file
+src/rtsp/h264_access_unit.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/rtsp/h264_access_unit.cpp.i
+.PHONY : src/rtsp/h264_access_unit.cpp.i
+
+src/rtsp/h264_access_unit.s: src/rtsp/h264_access_unit.cpp.s
+.PHONY : src/rtsp/h264_access_unit.s
+
+# target to generate assembly for a file
+src/rtsp/h264_access_unit.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/rtsp/h264_access_unit.cpp.s
+.PHONY : src/rtsp/h264_access_unit.cpp.s
 
 src/rtsp/rtp_source.o: src/rtsp/rtp_source.cpp.o
 .PHONY : src/rtsp/rtp_source.o
@@ -561,6 +776,270 @@ src/rtsp/rtspserver.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/rtsp/rtspserver.cpp.s
 .PHONY : src/rtsp/rtspserver.cpp.s
 
+src/webrtc/datachannel.o: src/webrtc/datachannel.cpp.o
+.PHONY : src/webrtc/datachannel.o
+
+# target to build an object file
+src/webrtc/datachannel.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/datachannel.cpp.o
+.PHONY : src/webrtc/datachannel.cpp.o
+
+src/webrtc/datachannel.i: src/webrtc/datachannel.cpp.i
+.PHONY : src/webrtc/datachannel.i
+
+# target to preprocess a source file
+src/webrtc/datachannel.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/datachannel.cpp.i
+.PHONY : src/webrtc/datachannel.cpp.i
+
+src/webrtc/datachannel.s: src/webrtc/datachannel.cpp.s
+.PHONY : src/webrtc/datachannel.s
+
+# target to generate assembly for a file
+src/webrtc/datachannel.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/datachannel.cpp.s
+.PHONY : src/webrtc/datachannel.cpp.s
+
+src/webrtc/dtlstransport.o: src/webrtc/dtlstransport.cpp.o
+.PHONY : src/webrtc/dtlstransport.o
+
+# target to build an object file
+src/webrtc/dtlstransport.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/dtlstransport.cpp.o
+.PHONY : src/webrtc/dtlstransport.cpp.o
+
+src/webrtc/dtlstransport.i: src/webrtc/dtlstransport.cpp.i
+.PHONY : src/webrtc/dtlstransport.i
+
+# target to preprocess a source file
+src/webrtc/dtlstransport.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/dtlstransport.cpp.i
+.PHONY : src/webrtc/dtlstransport.cpp.i
+
+src/webrtc/dtlstransport.s: src/webrtc/dtlstransport.cpp.s
+.PHONY : src/webrtc/dtlstransport.s
+
+# target to generate assembly for a file
+src/webrtc/dtlstransport.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/dtlstransport.cpp.s
+.PHONY : src/webrtc/dtlstransport.cpp.s
+
+src/webrtc/ice_agent.o: src/webrtc/ice_agent.cpp.o
+.PHONY : src/webrtc/ice_agent.o
+
+# target to build an object file
+src/webrtc/ice_agent.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/ice_agent.cpp.o
+.PHONY : src/webrtc/ice_agent.cpp.o
+
+src/webrtc/ice_agent.i: src/webrtc/ice_agent.cpp.i
+.PHONY : src/webrtc/ice_agent.i
+
+# target to preprocess a source file
+src/webrtc/ice_agent.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/ice_agent.cpp.i
+.PHONY : src/webrtc/ice_agent.cpp.i
+
+src/webrtc/ice_agent.s: src/webrtc/ice_agent.cpp.s
+.PHONY : src/webrtc/ice_agent.s
+
+# target to generate assembly for a file
+src/webrtc/ice_agent.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/ice_agent.cpp.s
+.PHONY : src/webrtc/ice_agent.cpp.s
+
+src/webrtc/ice_candidate.o: src/webrtc/ice_candidate.cpp.o
+.PHONY : src/webrtc/ice_candidate.o
+
+# target to build an object file
+src/webrtc/ice_candidate.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/ice_candidate.cpp.o
+.PHONY : src/webrtc/ice_candidate.cpp.o
+
+src/webrtc/ice_candidate.i: src/webrtc/ice_candidate.cpp.i
+.PHONY : src/webrtc/ice_candidate.i
+
+# target to preprocess a source file
+src/webrtc/ice_candidate.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/ice_candidate.cpp.i
+.PHONY : src/webrtc/ice_candidate.cpp.i
+
+src/webrtc/ice_candidate.s: src/webrtc/ice_candidate.cpp.s
+.PHONY : src/webrtc/ice_candidate.s
+
+# target to generate assembly for a file
+src/webrtc/ice_candidate.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/ice_candidate.cpp.s
+.PHONY : src/webrtc/ice_candidate.cpp.s
+
+src/webrtc/ice_transport.o: src/webrtc/ice_transport.cpp.o
+.PHONY : src/webrtc/ice_transport.o
+
+# target to build an object file
+src/webrtc/ice_transport.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/ice_transport.cpp.o
+.PHONY : src/webrtc/ice_transport.cpp.o
+
+src/webrtc/ice_transport.i: src/webrtc/ice_transport.cpp.i
+.PHONY : src/webrtc/ice_transport.i
+
+# target to preprocess a source file
+src/webrtc/ice_transport.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/ice_transport.cpp.i
+.PHONY : src/webrtc/ice_transport.cpp.i
+
+src/webrtc/ice_transport.s: src/webrtc/ice_transport.cpp.s
+.PHONY : src/webrtc/ice_transport.s
+
+# target to generate assembly for a file
+src/webrtc/ice_transport.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/ice_transport.cpp.s
+.PHONY : src/webrtc/ice_transport.cpp.s
+
+src/webrtc/peerconnection.o: src/webrtc/peerconnection.cpp.o
+.PHONY : src/webrtc/peerconnection.o
+
+# target to build an object file
+src/webrtc/peerconnection.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/peerconnection.cpp.o
+.PHONY : src/webrtc/peerconnection.cpp.o
+
+src/webrtc/peerconnection.i: src/webrtc/peerconnection.cpp.i
+.PHONY : src/webrtc/peerconnection.i
+
+# target to preprocess a source file
+src/webrtc/peerconnection.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/peerconnection.cpp.i
+.PHONY : src/webrtc/peerconnection.cpp.i
+
+src/webrtc/peerconnection.s: src/webrtc/peerconnection.cpp.s
+.PHONY : src/webrtc/peerconnection.s
+
+# target to generate assembly for a file
+src/webrtc/peerconnection.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/peerconnection.cpp.s
+.PHONY : src/webrtc/peerconnection.cpp.s
+
+src/webrtc/sdp.o: src/webrtc/sdp.cpp.o
+.PHONY : src/webrtc/sdp.o
+
+# target to build an object file
+src/webrtc/sdp.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/sdp.cpp.o
+.PHONY : src/webrtc/sdp.cpp.o
+
+src/webrtc/sdp.i: src/webrtc/sdp.cpp.i
+.PHONY : src/webrtc/sdp.i
+
+# target to preprocess a source file
+src/webrtc/sdp.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/sdp.cpp.i
+.PHONY : src/webrtc/sdp.cpp.i
+
+src/webrtc/sdp.s: src/webrtc/sdp.cpp.s
+.PHONY : src/webrtc/sdp.s
+
+# target to generate assembly for a file
+src/webrtc/sdp.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/sdp.cpp.s
+.PHONY : src/webrtc/sdp.cpp.s
+
+src/webrtc/srtcp_ctl.o: src/webrtc/srtcp_ctl.cpp.o
+.PHONY : src/webrtc/srtcp_ctl.o
+
+# target to build an object file
+src/webrtc/srtcp_ctl.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/srtcp_ctl.cpp.o
+.PHONY : src/webrtc/srtcp_ctl.cpp.o
+
+src/webrtc/srtcp_ctl.i: src/webrtc/srtcp_ctl.cpp.i
+.PHONY : src/webrtc/srtcp_ctl.i
+
+# target to preprocess a source file
+src/webrtc/srtcp_ctl.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/srtcp_ctl.cpp.i
+.PHONY : src/webrtc/srtcp_ctl.cpp.i
+
+src/webrtc/srtcp_ctl.s: src/webrtc/srtcp_ctl.cpp.s
+.PHONY : src/webrtc/srtcp_ctl.s
+
+# target to generate assembly for a file
+src/webrtc/srtcp_ctl.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/srtcp_ctl.cpp.s
+.PHONY : src/webrtc/srtcp_ctl.cpp.s
+
+src/webrtc/srtp_ctl.o: src/webrtc/srtp_ctl.cpp.o
+.PHONY : src/webrtc/srtp_ctl.o
+
+# target to build an object file
+src/webrtc/srtp_ctl.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/srtp_ctl.cpp.o
+.PHONY : src/webrtc/srtp_ctl.cpp.o
+
+src/webrtc/srtp_ctl.i: src/webrtc/srtp_ctl.cpp.i
+.PHONY : src/webrtc/srtp_ctl.i
+
+# target to preprocess a source file
+src/webrtc/srtp_ctl.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/srtp_ctl.cpp.i
+.PHONY : src/webrtc/srtp_ctl.cpp.i
+
+src/webrtc/srtp_ctl.s: src/webrtc/srtp_ctl.cpp.s
+.PHONY : src/webrtc/srtp_ctl.s
+
+# target to generate assembly for a file
+src/webrtc/srtp_ctl.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/srtp_ctl.cpp.s
+.PHONY : src/webrtc/srtp_ctl.cpp.s
+
+src/webrtc/srtp_session.o: src/webrtc/srtp_session.cpp.o
+.PHONY : src/webrtc/srtp_session.o
+
+# target to build an object file
+src/webrtc/srtp_session.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/srtp_session.cpp.o
+.PHONY : src/webrtc/srtp_session.cpp.o
+
+src/webrtc/srtp_session.i: src/webrtc/srtp_session.cpp.i
+.PHONY : src/webrtc/srtp_session.i
+
+# target to preprocess a source file
+src/webrtc/srtp_session.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/srtp_session.cpp.i
+.PHONY : src/webrtc/srtp_session.cpp.i
+
+src/webrtc/srtp_session.s: src/webrtc/srtp_session.cpp.s
+.PHONY : src/webrtc/srtp_session.s
+
+# target to generate assembly for a file
+src/webrtc/srtp_session.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/srtp_session.cpp.s
+.PHONY : src/webrtc/srtp_session.cpp.s
+
+src/webrtc/stun_protocol.o: src/webrtc/stun_protocol.cpp.o
+.PHONY : src/webrtc/stun_protocol.o
+
+# target to build an object file
+src/webrtc/stun_protocol.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/stun_protocol.cpp.o
+.PHONY : src/webrtc/stun_protocol.cpp.o
+
+src/webrtc/stun_protocol.i: src/webrtc/stun_protocol.cpp.i
+.PHONY : src/webrtc/stun_protocol.i
+
+# target to preprocess a source file
+src/webrtc/stun_protocol.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/stun_protocol.cpp.i
+.PHONY : src/webrtc/stun_protocol.cpp.i
+
+src/webrtc/stun_protocol.s: src/webrtc/stun_protocol.cpp.s
+.PHONY : src/webrtc/stun_protocol.s
+
+# target to generate assembly for a file
+src/webrtc/stun_protocol.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/uav_detection.dir/build.make CMakeFiles/uav_detection.dir/src/webrtc/stun_protocol.cpp.s
+.PHONY : src/webrtc/stun_protocol.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -568,8 +1047,17 @@ help:
 	@echo "... clean"
 	@echo "... depend"
 	@echo "... edit_cache"
+	@echo "... install"
+	@echo "... install/local"
+	@echo "... install/strip"
+	@echo "... list_install_components"
 	@echo "... rebuild_cache"
 	@echo "... uav_detection"
+	@echo "... uav_gateway"
+	@echo "... uav_gateway_lib"
+	@echo "... src/camera/airui_protocol.o"
+	@echo "... src/camera/airui_protocol.i"
+	@echo "... src/camera/airui_protocol.s"
 	@echo "... src/camera/mipi_ctl.o"
 	@echo "... src/camera/mipi_ctl.i"
 	@echo "... src/camera/mipi_ctl.s"
@@ -582,6 +1070,15 @@ help:
 	@echo "... src/camera/shihui_protocol.o"
 	@echo "... src/camera/shihui_protocol.i"
 	@echo "... src/camera/shihui_protocol.s"
+	@echo "... src/camera/thermal_camera.o"
+	@echo "... src/camera/thermal_camera.i"
+	@echo "... src/camera/thermal_camera.s"
+	@echo "... src/camera/thermal_camera_ctl.o"
+	@echo "... src/camera/thermal_camera_ctl.i"
+	@echo "... src/camera/thermal_camera_ctl.s"
+	@echo "... src/common/udp_socket.o"
+	@echo "... src/common/udp_socket.i"
+	@echo "... src/common/udp_socket.s"
 	@echo "... src/gb28181/gb28181_media.o"
 	@echo "... src/gb28181/gb28181_media.i"
 	@echo "... src/gb28181/gb28181_media.s"
@@ -612,9 +1109,15 @@ help:
 	@echo "... src/main.o"
 	@echo "... src/main.i"
 	@echo "... src/main.s"
+	@echo "... src/ptz/ptz_protocol.o"
+	@echo "... src/ptz/ptz_protocol.i"
+	@echo "... src/ptz/ptz_protocol.s"
 	@echo "... src/rtsp/file_source.o"
 	@echo "... src/rtsp/file_source.i"
 	@echo "... src/rtsp/file_source.s"
+	@echo "... src/rtsp/h264_access_unit.o"
+	@echo "... src/rtsp/h264_access_unit.i"
+	@echo "... src/rtsp/h264_access_unit.s"
 	@echo "... src/rtsp/rtp_source.o"
 	@echo "... src/rtsp/rtp_source.i"
 	@echo "... src/rtsp/rtp_source.s"
@@ -624,6 +1127,39 @@ help:
 	@echo "... src/rtsp/rtspserver.o"
 	@echo "... src/rtsp/rtspserver.i"
 	@echo "... src/rtsp/rtspserver.s"
+	@echo "... src/webrtc/datachannel.o"
+	@echo "... src/webrtc/datachannel.i"
+	@echo "... src/webrtc/datachannel.s"
+	@echo "... src/webrtc/dtlstransport.o"
+	@echo "... src/webrtc/dtlstransport.i"
+	@echo "... src/webrtc/dtlstransport.s"
+	@echo "... src/webrtc/ice_agent.o"
+	@echo "... src/webrtc/ice_agent.i"
+	@echo "... src/webrtc/ice_agent.s"
+	@echo "... src/webrtc/ice_candidate.o"
+	@echo "... src/webrtc/ice_candidate.i"
+	@echo "... src/webrtc/ice_candidate.s"
+	@echo "... src/webrtc/ice_transport.o"
+	@echo "... src/webrtc/ice_transport.i"
+	@echo "... src/webrtc/ice_transport.s"
+	@echo "... src/webrtc/peerconnection.o"
+	@echo "... src/webrtc/peerconnection.i"
+	@echo "... src/webrtc/peerconnection.s"
+	@echo "... src/webrtc/sdp.o"
+	@echo "... src/webrtc/sdp.i"
+	@echo "... src/webrtc/sdp.s"
+	@echo "... src/webrtc/srtcp_ctl.o"
+	@echo "... src/webrtc/srtcp_ctl.i"
+	@echo "... src/webrtc/srtcp_ctl.s"
+	@echo "... src/webrtc/srtp_ctl.o"
+	@echo "... src/webrtc/srtp_ctl.i"
+	@echo "... src/webrtc/srtp_ctl.s"
+	@echo "... src/webrtc/srtp_session.o"
+	@echo "... src/webrtc/srtp_session.i"
+	@echo "... src/webrtc/srtp_session.s"
+	@echo "... src/webrtc/stun_protocol.o"
+	@echo "... src/webrtc/stun_protocol.i"
+	@echo "... src/webrtc/stun_protocol.s"
 .PHONY : help
 
 

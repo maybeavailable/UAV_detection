@@ -6,6 +6,15 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 enable_testing()
 get_filename_component(UAV_PROJECT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 find_package(Threads REQUIRED)
+add_library(webrtc_test_log STATIC
+  "${UAV_PROJECT_ROOT}/src/log/log.cpp"
+  "${UAV_PROJECT_ROOT}/src/log/RotateFileWriter.cpp")
+target_include_directories(webrtc_test_log PUBLIC "${UAV_PROJECT_ROOT}/src")
+target_include_directories(webrtc_test_log SYSTEM PRIVATE "${UAV_PROJECT_ROOT}/third_party/boost/include")
+target_compile_options(webrtc_test_log PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(webrtc_test_log PUBLIC Threads::Threads)
+list(APPEND CMAKE_MODULE_PATH "${UAV_PROJECT_ROOT}/cmake")
+find_package(USRSCTP REQUIRED)
 add_executable(ice_candidate_test ice_candidate_test.cpp
   "${UAV_PROJECT_ROOT}/src/webrtc/ice_candidate.cpp"
   "${UAV_PROJECT_ROOT}/src/common/udp_socket.cpp")
@@ -26,7 +35,8 @@ target_link_libraries(sdp_test PRIVATE Threads::Threads)
 add_test(NAME sdp COMMAND sdp_test)
 set_tests_properties(sdp PROPERTIES TIMEOUT 10)
 
-find_package(OpenSSL REQUIRED COMPONENTS Crypto)
+find_package(OpenSSL REQUIRED COMPONENTS SSL Crypto)
+find_package(SRTP REQUIRED)
 add_executable(stun_protocol_test stun_protocol_test.cpp
   "${UAV_PROJECT_ROOT}/src/webrtc/stun_protocol.cpp"
   "${UAV_PROJECT_ROOT}/src/webrtc/ice_candidate.cpp"
@@ -64,3 +74,139 @@ target_compile_options(ice_transport_test PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(ice_transport_test PRIVATE Threads::Threads OpenSSL::Crypto)
 add_test(NAME ice_transport COMMAND ice_transport_test)
 set_tests_properties(ice_transport PROPERTIES TIMEOUT 20)
+
+add_executable(dtls_transport_test dtls_transport_test.cpp
+  "${UAV_PROJECT_ROOT}/src/webrtc/srtp_session.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/srtp_ctl.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/srtcp_ctl.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/dtlstransport.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/pacer.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/rtcp_protocol.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/rtcp_session.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/ice_transport.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/ice_agent.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/stun_protocol.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/ice_candidate.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/sdp.cpp"
+  "${UAV_PROJECT_ROOT}/src/common/udp_socket.cpp")
+target_include_directories(dtls_transport_test PRIVATE "${UAV_PROJECT_ROOT}/src")
+target_include_directories(dtls_transport_test SYSTEM PRIVATE "${UAV_PROJECT_ROOT}/third_party/boost/include")
+target_compile_options(dtls_transport_test PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(dtls_transport_test PRIVATE SRTP::SRTP Threads::Threads OpenSSL::SSL OpenSSL::Crypto)
+add_test(NAME dtls_transport COMMAND dtls_transport_test)
+set_tests_properties(dtls_transport PROPERTIES TIMEOUT 30)
+
+add_executable(peerconnection_test peerconnection_test.cpp
+  "${UAV_PROJECT_ROOT}/src/webrtc/srtp_session.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/srtp_ctl.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/srtcp_ctl.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/datachannel.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/peerconnection.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/dtlstransport.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/pacer.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/rtcp_protocol.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/rtcp_session.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/ice_transport.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/ice_agent.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/stun_protocol.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/ice_candidate.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/sdp.cpp"
+  "${UAV_PROJECT_ROOT}/src/common/udp_socket.cpp")
+target_include_directories(peerconnection_test PRIVATE "${UAV_PROJECT_ROOT}/src")
+target_include_directories(peerconnection_test SYSTEM PRIVATE "${UAV_PROJECT_ROOT}/third_party/boost/include")
+target_compile_options(peerconnection_test PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(peerconnection_test PRIVATE SRTP::SRTP USRSCTP::USRSCTP Threads::Threads OpenSSL::SSL OpenSSL::Crypto)
+add_test(NAME peerconnection COMMAND peerconnection_test)
+set_tests_properties(peerconnection PROPERTIES TIMEOUT 30)
+
+# 独立测试工程使用宿主架构 libsrtp2；可通过 -DSRTP_ROOT=/path/to/native/prefix 指定。
+add_executable(srtp_ctl_test srtp_ctl_test.cpp
+  "${UAV_PROJECT_ROOT}/src/webrtc/srtp_session.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/srtp_ctl.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/srtcp_ctl.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/datachannel.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/peerconnection.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/dtlstransport.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/pacer.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/rtcp_protocol.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/rtcp_session.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/ice_transport.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/ice_agent.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/stun_protocol.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/ice_candidate.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/sdp.cpp"
+  "${UAV_PROJECT_ROOT}/src/common/udp_socket.cpp")
+target_include_directories(srtp_ctl_test PRIVATE "${UAV_PROJECT_ROOT}/src")
+target_include_directories(srtp_ctl_test SYSTEM PRIVATE "${UAV_PROJECT_ROOT}/third_party/boost/include")
+target_compile_options(srtp_ctl_test PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(srtp_ctl_test PRIVATE USRSCTP::USRSCTP SRTP::SRTP Threads::Threads OpenSSL::SSL OpenSSL::Crypto)
+add_test(NAME srtp_ctl COMMAND srtp_ctl_test rtp)
+add_test(NAME srtcp_ctl COMMAND srtp_ctl_test rtcp)
+add_test(NAME dtls_srtp COMMAND srtp_ctl_test integration)
+set_tests_properties(srtp_ctl srtcp_ctl dtls_srtp PROPERTIES TIMEOUT 30)
+
+add_executable(datachannel_test datachannel_test.cpp
+  "${UAV_PROJECT_ROOT}/src/webrtc/datachannel.cpp")
+target_include_directories(datachannel_test PRIVATE "${UAV_PROJECT_ROOT}/src")
+target_include_directories(datachannel_test SYSTEM PRIVATE "${UAV_PROJECT_ROOT}/third_party/boost/include")
+target_compile_options(datachannel_test PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(datachannel_test PRIVATE USRSCTP::USRSCTP Threads::Threads)
+add_test(NAME datachannel COMMAND datachannel_test)
+set_tests_properties(datachannel PROPERTIES TIMEOUT 30)
+
+add_executable(datachannel_peer_test datachannel_peer_test.cpp
+  "${UAV_PROJECT_ROOT}/src/webrtc/srtp_session.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/srtp_ctl.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/srtcp_ctl.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/datachannel.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/peerconnection.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/dtlstransport.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/pacer.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/rtcp_protocol.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/rtcp_session.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/ice_transport.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/ice_agent.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/stun_protocol.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/ice_candidate.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/sdp.cpp"
+  "${UAV_PROJECT_ROOT}/src/common/udp_socket.cpp")
+target_include_directories(datachannel_peer_test PRIVATE "${UAV_PROJECT_ROOT}/src")
+target_include_directories(datachannel_peer_test SYSTEM PRIVATE "${UAV_PROJECT_ROOT}/third_party/boost/include")
+target_compile_options(datachannel_peer_test PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(datachannel_peer_test PRIVATE SRTP::SRTP USRSCTP::USRSCTP Threads::Threads OpenSSL::SSL OpenSSL::Crypto)
+add_test(NAME datachannel_peer COMMAND datachannel_peer_test)
+set_tests_properties(datachannel_peer PROPERTIES TIMEOUT 30)
+
+# 使用真实日志库验证状态/故障路径，主工程已经包含这两个日志实现文件。
+foreach(webrtc_logged_target IN ITEMS ice_agent_test ice_transport_test dtls_transport_test
+    peerconnection_test srtp_ctl_test datachannel_test datachannel_peer_test)
+  target_link_libraries(${webrtc_logged_target} PRIVATE webrtc_test_log)
+endforeach()
+
+add_executable(rtcp_session_test rtcp_session_test.cpp
+  "${UAV_PROJECT_ROOT}/src/webrtc/rtcp_protocol.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/rtcp_session.cpp")
+target_include_directories(rtcp_session_test PRIVATE "${UAV_PROJECT_ROOT}/src")
+target_include_directories(rtcp_session_test SYSTEM PRIVATE "${UAV_PROJECT_ROOT}/third_party/boost/include")
+target_compile_options(rtcp_session_test PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(rtcp_session_test PRIVATE webrtc_test_log)
+add_test(NAME rtcp_session COMMAND rtcp_session_test)
+set_tests_properties(rtcp_session PROPERTIES TIMEOUT 20)
+
+add_executable(pacer_test pacer_test.cpp
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/pacer.cpp")
+target_include_directories(pacer_test PRIVATE "${UAV_PROJECT_ROOT}/src")
+target_compile_options(pacer_test PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME pacer COMMAND pacer_test)
+set_tests_properties(pacer PROPERTIES TIMEOUT 10)
+
+# Each DTLS/PeerConnection executable embeds the pacing engine independently.
+foreach(pacing_target IN ITEMS pacer_test dtls_transport_test peerconnection_test srtp_ctl_test datachannel_peer_test)
+  target_sources(${pacing_target} PRIVATE "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/interval_budget.cpp")
+endforeach()
+add_executable(interval_budget_test interval_budget_test.cpp
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/interval_budget.cpp")
+target_include_directories(interval_budget_test PRIVATE "${UAV_PROJECT_ROOT}/src")
+target_compile_options(interval_budget_test PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME interval_budget COMMAND interval_budget_test)
+set_tests_properties(interval_budget PROPERTIES TIMEOUT 10)

@@ -1,0 +1,12 @@
+prefix=/home/huangquan/code/UAV_detection/third_party/libsrtp
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: libsrtp2
+Version: 2.8.1
+Description: Library for SRTP (Secure Realtime Transport Protocol)
+
+Libs: -L${libdir} -lsrtp2
+Libs.private: -L/home/huangquan/code/UAV_detection/third_party/openssl/lib -lcrypto -ldl -pthread 
+Cflags: -I${includedir}

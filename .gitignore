@@ -1,6 +1,13 @@
 build/
 CMakeFiles/
 cmake/
+# 上面这条 cmake/ 会匹配任意层级的 cmake 目录，仓库根的 cmake/ 放的是源码
+# （toolchain-ascend-aarch64.cmake + FindAscend/FindEXosip2/FindSRTP），必须放开：
+# FindAscend.cmake / FindEXosip2.cmake / toolchain-ascend-aarch64.cmake 就是因为
+# 这条规则一直没进版本库，新克隆的仓库压根配置不了 ascend-aarch64 预设。
+# !/cmake/ 带前导斜杠，只作用于仓库根的 cmake/，third_party/*/lib/cmake/ 里的
+# 生成文件仍然被忽略。
+!/cmake/
 cmake_install.cmake
 CMakeCache.txt
 README.md

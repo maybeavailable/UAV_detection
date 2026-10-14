@@ -1,4 +1,5 @@
 #include"webrtc/ice_agent.h"
+#include"log/log.h"
 #include"webrtc/sdp.h"
 
 #include<boost/asio/ip/udp.hpp>
@@ -98,6 +99,22 @@ bool sameCredentials(const IceCredentials& a, const IceCredentials& b)
     return a.ufrag == b.ufrag && a.password == b.password;
 }
 void complete(const IceAgent::Completion& done, ErrorCode ec = {}) { if (done) done(ec); }
+const char* stateName(IceAgentState state)
+{
+    switch (state)
+    {
+    case IceAgentState::New: return "New"; case IceAgentState::Checking: return "Checking";
+    case IceAgentState::Connected: return "Connected"; case IceAgentState::Completed: return "Completed";
+    case IceAgentState::Disconnected: return "Disconnected"; case IceAgentState::Failed: return "Failed";
+    case IceAgentState::Closed: return "Closed";
+    }
+    return "Unknown";
+}
+const char* gatheringName(IceGatheringState state)
+{
+    switch (state) { case IceGatheringState::New: return "New"; case IceGatheringState::Gathering: return "Gathering"; case IceGatheringState::Complete: return "Complete"; }
+    return "Unknown";
+}
 } // namespace
 
 bool IceCredentials::validate(std::string* reason) const
@@ -175,6 +192,7 @@ struct IceAgent::Impl : std::enable_shared_from_this<IceAgent::Impl>
     std::vector<std::shared_ptr<Resolution>> resolutions;
     std::vector<Completion> closeCallbacks;
     std::size_t closingSockets{0};
+    std::uint64_t loggedErrors{0};
     mutable std::mutex snapshotMutex;
     Snapshot published;
 
@@ -230,22 +248,29 @@ struct IceAgent::Impl : std::enable_shared_from_this<IceAgent::Impl>
     }
     void error(ErrorCode ec, const char* message)
     {
+        ++loggedErrors;
+        UAV_LOG_IF(LogLevel::WARN, (loggedErrors & (loggedErrors - 1)) == 0)
+            << "[WebRTC][ICE agent " << this << "][g=" << generation << "] " << message
+            << " error=" << ec.value() << ":" << ec.message() << " errors=" << loggedErrors;
         if (callbacks.onError) callbacks.onError(ec, message);
     }
     void setState(IceAgentState value)
     {
         if (state == value) return;
-        state = value; publish();
+        const auto previous = state; state = value; publish();
+        UAV_LOG_INFO << "[WebRTC][ICE agent " << this << "][g=" << generation << "] state " << stateName(previous) << " -> " << stateName(value);
         if (callbacks.onState) callbacks.onState(value);
     }
     void setGathering(IceGatheringState value)
     {
         if (gathering == value) return;
         gathering = value; publish();
+        UAV_LOG_INFO << "[WebRTC][ICE agent " << this << "][g=" << generation << "] gathering=" << gatheringName(value) << " candidates=" << locals.size();
         if (callbacks.onGatheringState) callbacks.onGatheringState(value);
     }
     void fail(const char* message, ErrorCode ec = net::error::timed_out)
     {
+        UAV_LOG_ERROR << "[WebRTC][ICE agent " << this << "][g=" << generation << "] failed: " << message << " error=" << ec.value() << ":" << ec.message() << " pairs=" << pairs.size();
         transactions.clear(); triggered.clear(); gatherJobs.clear();
         for (auto& pair : pairs)
         {
@@ -280,6 +305,9 @@ struct IceAgent::Impl : std::enable_shared_from_this<IceAgent::Impl>
                 value.relatedAddress == candidate.relatedAddress && value.relatedPort == candidate.relatedPort) return;
         if (locals.size() >= config.maxCandidates) return;
         locals.push_back(candidate); publish();
+        UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG))
+            << "[WebRTC][ICE agent " << this << "][g=" << generation << "] local candidate component=" << candidate.component
+            << " type=" << static_cast<int>(candidate.type) << " port=" << candidate.port << " priority=" << candidate.priority;
         if (callbacks.onLocalCandidate) callbacks.onLocalCandidate(std::move(candidate));
     }
     Ms consentDelay() const
@@ -439,6 +467,8 @@ struct IceAgent::Impl : std::enable_shared_from_this<IceAgent::Impl>
     void changeRole(StunIceRole value)
     {
         if (role == value) return;
+        UAV_LOG_INFO << "[WebRTC][ICE agent " << this << "][g=" << generation << "] role "
+            << (role == StunIceRole::Controlling ? "controlling" : "controlled") << " -> " << (value == StunIceRole::Controlling ? "controlling" : "controlled");
         role = value;
         for (auto& pair : pairs)
         {
@@ -496,6 +526,9 @@ struct IceAgent::Impl : std::enable_shared_from_this<IceAgent::Impl>
             }
         if (remotes.size() >= config.maxCandidates) return net::error::no_buffer_space;
         remotes.push_back({std::move(candidate), endpoint, std::move(ufrag)});
+        UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG))
+            << "[WebRTC][ICE agent " << this << "][g=" << generation << "] remote candidate component="
+            << remotes.back().candidate.component << " endpoint=" << endpoint << " type=" << static_cast<int>(remotes.back().candidate.type);
         for (std::size_t i = 0; i < transports.size(); ++i) makePair(i, remotes.size() - 1);
         schedule(); publish();
         return {};
@@ -593,6 +626,9 @@ struct IceAgent::Impl : std::enable_shared_from_this<IceAgent::Impl>
     }
     void transactionFailed(const Transaction& transaction)
     {
+        UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG))
+            << "[WebRTC][ICE agent " << this << "][g=" << generation << "] STUN transaction failed kind=" << static_cast<int>(transaction.kind)
+            << " pair=" << transaction.pair << " destination=" << transaction.destination << " attempts=" << transaction.sends << " obsolete=" << transaction.obsolete;
         if (transaction.kind == Kind::Gather)
         {
             error(net::error::timed_out, "ICE STUN gathering transaction failed"); finishGathering(); return;
@@ -618,6 +654,8 @@ struct IceAgent::Impl : std::enable_shared_from_this<IceAgent::Impl>
     {
         if (selected(pair.info.local.component) || !pair.info.valid) return;
         pair.info.nominated = true; pair.nominating = false;
+        UAV_LOG_INFO << "[WebRTC][ICE agent " << this << "][g=" << generation << "] nominated pair=" << pair.info.id
+            << " component=" << pair.info.local.component << " local=" << pair.info.localEndpoint << " remote=" << pair.info.remoteEndpoint;
         pair.nextConsent = Clock::now() + consentDelay();
         for (auto& other : pairs)
             if (other.info.local.component == pair.info.local.component && other.info.id != pair.info.id)
@@ -937,6 +975,8 @@ struct IceAgent::Impl : std::enable_shared_from_this<IceAgent::Impl>
         if (!value.validate() || (newRole != StunIceRole::Controlled && newRole != StunIceRole::Controlling) ||
             value.ufrag == local.ufrag || value.password == local.password) return net::error::invalid_argument;
         ++generation;
+        UAV_LOG_INFO << "[WebRTC][ICE agent " << this << "][g=" << generation << "] restart role="
+            << (newRole == StunIceRole::Controlling ? "controlling" : "controlled") << " retained_candidates=" << locals.size();
         timer.cancel(); ticking = false; cancelResolutions();
         transactions.clear(); gatherJobs.clear(); pairs.clear(); remotes.clear();
         triggered.clear(); earlyChecks.clear(); responseCache.clear();
@@ -969,6 +1009,7 @@ struct IceAgent::Impl : std::enable_shared_from_this<IceAgent::Impl>
     }
     void finishClose()
     {
+        UAV_LOG_INFO << "[WebRTC][ICE agent " << this << "][g=" << generation << "] closed transports=" << transports.size();
         closeFinished = true;
         auto pending = std::move(closeCallbacks); closeCallbacks.clear();
         for (const auto& done : pending) complete(done);

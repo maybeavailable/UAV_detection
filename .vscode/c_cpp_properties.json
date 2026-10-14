@@ -12,8 +12,10 @@
   // 指向 llvm-project，优先级的规则是“本文件写了就用本文件的，没写才用 ${default}”。
   //
   // 切换预设时改这一行即可：
-  //   build/ascend-aarch64/compile_commands.json  昇腾 aarch64（默认，海思头齐全）
-  //   build/native/compile_commands.json          本机 x86_64（UAV_ASCEND=OFF，无海思头）
+  //   build/ascend-aarch64/compile_commands.json        昇腾 aarch64（默认，海思头齐全）
+  //   build/ascend-aarch64-release/compile_commands.json Release 构建
+  // 说明：本工程只有交叉编译入口 —— uav_detection 是板端程序，CMakeLists.txt 里
+  // 没有 CMAKE_CROSSCOMPILING 时会直接报错退出，所以不再有 build/native 那份数据库。
   "version": 4,
   "configurations": [
     {
@@ -33,6 +35,8 @@
         "${workspaceFolder}/third_party/libxml2/include/libxml2",
         "${workspaceFolder}/third_party/libeXosip2/include",
         "${workspaceFolder}/third_party/libosip2/include",
+        "${workspaceFolder}/third_party/libsrtp/include",
+        "${workspaceFolder}/third_party/usrsctp/include",
         "/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include",
         "/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl",
         "/usr/local/Ascend/ascend-toolkit/latest/aarch64-linux/include/acl/dvpp",

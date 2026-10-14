@@ -1,0 +1,208 @@
+[2026-10-14 18:11:51.561] [INFO ] [tid:231289] [ice_agent.cpp:268] [WebRTC][ICE agent 0x5555557c19d0][g=0] gathering=Gathering candidates=0
+[2026-10-14 18:11:51.561] [INFO ] [tid:231289] [ice_agent.cpp:268] [WebRTC][ICE agent 0x5555557c19d0][g=0] gathering=Complete candidates=1
+[2026-10-14 18:11:51.561] [INFO ] [tid:231289] [ice_agent.cpp:268] [WebRTC][ICE agent 0x55555572d2e0][g=0] gathering=Gathering candidates=0
+[2026-10-14 18:11:51.561] [INFO ] [tid:231289] [ice_agent.cpp:268] [WebRTC][ICE agent 0x55555572d2e0][g=0] gathering=Complete candidates=1
+[2026-10-14 18:11:51.564] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x5555557c19d0][g=0] state New -> Checking
+[2026-10-14 18:11:51.564] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555572d2e0][g=0] state New -> Checking
+[2026-10-14 18:11:51.564] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x5555557c0f30][g=0] state New -> Checking selected=0
+[2026-10-14 18:11:51.564] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x55555572c1d0][g=0] state New -> Checking selected=0
+[2026-10-14 18:11:51.571] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x5555557c19d0][g=0] state Checking -> Connected
+[2026-10-14 18:11:51.571] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555572d2e0][g=0] state Checking -> Connected
+[2026-10-14 18:11:51.874] [INFO ] [tid:231289] [ice_agent.cpp:657] [WebRTC][ICE agent 0x5555557c19d0][g=0] nominated pair=1 component=1 local=127.0.0.1:52290 remote=127.0.0.1:42202
+[2026-10-14 18:11:51.874] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x5555557c19d0][g=0] state Connected -> Completed
+[2026-10-14 18:11:51.874] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x5555557c0f30][g=0] state Checking -> Connected selected=1
+[2026-10-14 18:11:51.874] [INFO ] [tid:231289] [ice_transport.cpp:195] [WebRTC][ICE transport 0x5555557c0f30][g=0] DTLS ready component=1 pair=1 role=client remote=127.0.0.1:42202
+[2026-10-14 18:11:51.874] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x5555557c0f30][g=0] state Connected -> Completed selected=1
+[2026-10-14 18:11:51.874] [INFO ] [tid:231289] [ice_agent.cpp:657] [WebRTC][ICE agent 0x55555572d2e0][g=0] nominated pair=1 component=1 local=127.0.0.1:42202 remote=127.0.0.1:52290
+[2026-10-14 18:11:51.874] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555572d2e0][g=0] state Connected -> Completed
+[2026-10-14 18:11:51.874] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x55555572c1d0][g=0] state Checking -> Connected selected=1
+[2026-10-14 18:11:51.874] [INFO ] [tid:231289] [ice_transport.cpp:195] [WebRTC][ICE transport 0x55555572c1d0][g=0] DTLS ready component=1 pair=1 role=server remote=127.0.0.1:52290
+[2026-10-14 18:11:51.874] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x55555572c1d0][g=0] state Connected -> Completed selected=1
+[2026-10-14 18:11:51.887] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x55555572c1d0][g=1] state Completed -> Closed selected=0
+[2026-10-14 18:11:51.887] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x5555557c0f30][g=1] state Completed -> Closed selected=0
+[2026-10-14 18:11:51.887] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555572d2e0][g=1] state Completed -> Closed
+[2026-10-14 18:11:51.887] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x5555557c19d0][g=1] state Completed -> Closed
+[2026-10-14 18:11:51.887] [INFO ] [tid:231289] [ice_agent.cpp:1012] [WebRTC][ICE agent 0x55555572d2e0][g=1] closed transports=1
+[2026-10-14 18:11:51.887] [INFO ] [tid:231289] [ice_agent.cpp:1012] [WebRTC][ICE agent 0x5555557c19d0][g=1] closed transports=1
+[2026-10-14 18:11:51.887] [INFO ] [tid:231289] [ice_transport.cpp:342] [WebRTC][ICE transport 0x55555572c1d0][g=1] closed sent=3 received=0 discarded=0 failed_sends=6
+[2026-10-14 18:11:51.887] [INFO ] [tid:231289] [ice_transport.cpp:342] [WebRTC][ICE transport 0x5555557c0f30][g=1] closed sent=0 received=3 discarded=0 failed_sends=0
+[2026-10-14 18:11:51.888] [INFO ] [tid:231289] [ice_agent.cpp:268] [WebRTC][ICE agent 0x55555572c0f0][g=0] gathering=Gathering candidates=0
+[2026-10-14 18:11:51.888] [INFO ] [tid:231289] [ice_agent.cpp:268] [WebRTC][ICE agent 0x55555572c0f0][g=0] gathering=Complete candidates=1
+[2026-10-14 18:11:51.888] [INFO ] [tid:231289] [ice_agent.cpp:268] [WebRTC][ICE agent 0x555555804dd0][g=0] gathering=Gathering candidates=0
+[2026-10-14 18:11:51.888] [INFO ] [tid:231289] [ice_agent.cpp:268] [WebRTC][ICE agent 0x555555804dd0][g=0] gathering=Complete candidates=1
+[2026-10-14 18:11:51.892] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555572c0f0][g=0] state New -> Checking
+[2026-10-14 18:11:51.892] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x555555804dd0][g=0] state New -> Checking
+[2026-10-14 18:11:51.892] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x55555572d1b0][g=0] state New -> Checking selected=0
+[2026-10-14 18:11:51.892] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x5555558063a0][g=0] state New -> Checking selected=0
+[2026-10-14 18:11:51.899] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555572c0f0][g=0] state Checking -> Connected
+[2026-10-14 18:11:51.899] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x555555804dd0][g=0] state Checking -> Connected
+[2026-10-14 18:11:52.035] [INFO ] [tid:231289] [ice_agent.cpp:657] [WebRTC][ICE agent 0x55555572c0f0][g=0] nominated pair=1 component=1 local=[::1]:56207 remote=[::1]:55385
+[2026-10-14 18:11:52.035] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555572c0f0][g=0] state Connected -> Completed
+[2026-10-14 18:11:52.035] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x55555572d1b0][g=0] state Checking -> Connected selected=1
+[2026-10-14 18:11:52.035] [INFO ] [tid:231289] [ice_transport.cpp:195] [WebRTC][ICE transport 0x55555572d1b0][g=0] DTLS ready component=1 pair=1 role=client remote=[::1]:55385
+[2026-10-14 18:11:52.035] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x55555572d1b0][g=0] state Connected -> Completed selected=1
+[2026-10-14 18:11:52.036] [INFO ] [tid:231289] [ice_agent.cpp:657] [WebRTC][ICE agent 0x555555804dd0][g=0] nominated pair=1 component=1 local=[::1]:55385 remote=[::1]:56207
+[2026-10-14 18:11:52.036] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x555555804dd0][g=0] state Connected -> Completed
+[2026-10-14 18:11:52.036] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x5555558063a0][g=0] state Checking -> Connected selected=1
+[2026-10-14 18:11:52.036] [INFO ] [tid:231289] [ice_transport.cpp:195] [WebRTC][ICE transport 0x5555558063a0][g=0] DTLS ready component=1 pair=1 role=server remote=[::1]:56207
+[2026-10-14 18:11:52.036] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x5555558063a0][g=0] state Connected -> Completed selected=1
+[2026-10-14 18:11:52.048] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x5555558063a0][g=1] state Completed -> Closed selected=0
+[2026-10-14 18:11:52.048] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x55555572d1b0][g=1] state Completed -> Closed selected=0
+[2026-10-14 18:11:52.048] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x555555804dd0][g=1] state Completed -> Closed
+[2026-10-14 18:11:52.048] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555572c0f0][g=1] state Completed -> Closed
+[2026-10-14 18:11:52.048] [INFO ] [tid:231289] [ice_agent.cpp:1012] [WebRTC][ICE agent 0x555555804dd0][g=1] closed transports=1
+[2026-10-14 18:11:52.049] [INFO ] [tid:231289] [ice_agent.cpp:1012] [WebRTC][ICE agent 0x55555572c0f0][g=1] closed transports=1
+[2026-10-14 18:11:52.049] [INFO ] [tid:231289] [ice_transport.cpp:342] [WebRTC][ICE transport 0x5555558063a0][g=1] closed sent=3 received=0 discarded=0 failed_sends=6
+[2026-10-14 18:11:52.049] [INFO ] [tid:231289] [ice_transport.cpp:342] [WebRTC][ICE transport 0x55555572d1b0][g=1] closed sent=0 received=3 discarded=0 failed_sends=0
+[2026-10-14 18:11:52.049] [INFO ] [tid:231289] [ice_agent.cpp:268] [WebRTC][ICE agent 0x5555558060a0][g=0] gathering=Gathering candidates=0
+[2026-10-14 18:11:52.049] [INFO ] [tid:231289] [ice_agent.cpp:268] [WebRTC][ICE agent 0x5555558060a0][g=0] gathering=Complete candidates=1
+[2026-10-14 18:11:52.050] [INFO ] [tid:231289] [ice_agent.cpp:268] [WebRTC][ICE agent 0x55555580a320][g=0] gathering=Gathering candidates=0
+[2026-10-14 18:11:52.050] [INFO ] [tid:231289] [ice_agent.cpp:268] [WebRTC][ICE agent 0x55555580a320][g=0] gathering=Complete candidates=1
+[2026-10-14 18:11:52.054] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x5555558060a0][g=0] state New -> Checking
+[2026-10-14 18:11:52.054] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555580a320][g=0] state New -> Checking
+[2026-10-14 18:11:52.054] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x555555804dd0][g=0] state New -> Checking selected=0
+[2026-10-14 18:11:52.054] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x55555572d1b0][g=0] state New -> Checking selected=0
+[2026-10-14 18:11:52.061] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x5555558060a0][g=0] state Checking -> Connected
+[2026-10-14 18:11:52.061] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555580a320][g=0] state Checking -> Connected
+[2026-10-14 18:11:52.749] [INFO ] [tid:231289] [ice_agent.cpp:657] [WebRTC][ICE agent 0x5555558060a0][g=0] nominated pair=1 component=1 local=127.0.0.1:45446 remote=127.0.0.1:35789
+[2026-10-14 18:11:52.749] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x5555558060a0][g=0] state Connected -> Completed
+[2026-10-14 18:11:52.749] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x555555804dd0][g=0] state Checking -> Connected selected=1
+[2026-10-14 18:11:52.749] [INFO ] [tid:231289] [ice_transport.cpp:195] [WebRTC][ICE transport 0x555555804dd0][g=0] DTLS ready component=1 pair=1 role=server remote=127.0.0.1:35789
+[2026-10-14 18:11:52.749] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x555555804dd0][g=0] state Connected -> Completed selected=1
+[2026-10-14 18:11:52.749] [INFO ] [tid:231289] [ice_agent.cpp:657] [WebRTC][ICE agent 0x55555580a320][g=0] nominated pair=1 component=1 local=127.0.0.1:35789 remote=127.0.0.1:45446
+[2026-10-14 18:11:52.749] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555580a320][g=0] state Connected -> Completed
+[2026-10-14 18:11:52.749] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x55555572d1b0][g=0] state Checking -> Connected selected=1
+[2026-10-14 18:11:52.749] [INFO ] [tid:231289] [ice_transport.cpp:195] [WebRTC][ICE transport 0x55555572d1b0][g=0] DTLS ready component=1 pair=1 role=client remote=127.0.0.1:45446
+[2026-10-14 18:11:52.749] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x55555572d1b0][g=0] state Connected -> Completed selected=1
+[2026-10-14 18:11:52.761] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x55555572d1b0][g=1] state Completed -> Closed selected=0
+[2026-10-14 18:11:52.762] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x555555804dd0][g=1] state Completed -> Closed selected=0
+[2026-10-14 18:11:52.762] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555580a320][g=1] state Completed -> Closed
+[2026-10-14 18:11:52.762] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x5555558060a0][g=1] state Completed -> Closed
+[2026-10-14 18:11:52.762] [INFO ] [tid:231289] [ice_agent.cpp:1012] [WebRTC][ICE agent 0x55555580a320][g=1] closed transports=1
+[2026-10-14 18:11:52.762] [INFO ] [tid:231289] [ice_agent.cpp:1012] [WebRTC][ICE agent 0x5555558060a0][g=1] closed transports=1
+[2026-10-14 18:11:52.762] [INFO ] [tid:231289] [ice_transport.cpp:342] [WebRTC][ICE transport 0x55555572d1b0][g=1] closed sent=3 received=0 discarded=0 failed_sends=6
+[2026-10-14 18:11:52.762] [INFO ] [tid:231289] [ice_transport.cpp:342] [WebRTC][ICE transport 0x555555804dd0][g=1] closed sent=0 received=3 discarded=0 failed_sends=0
+[2026-10-14 18:11:52.762] [INFO ] [tid:231289] [ice_agent.cpp:268] [WebRTC][ICE agent 0x55555572c2a0][g=0] gathering=Gathering candidates=0
+[2026-10-14 18:11:52.762] [INFO ] [tid:231289] [ice_agent.cpp:268] [WebRTC][ICE agent 0x55555572c2a0][g=0] gathering=Complete candidates=1
+[2026-10-14 18:11:52.762] [INFO ] [tid:231289] [ice_agent.cpp:268] [WebRTC][ICE agent 0x555555805f10][g=0] gathering=Gathering candidates=0
+[2026-10-14 18:11:52.762] [INFO ] [tid:231289] [ice_agent.cpp:268] [WebRTC][ICE agent 0x555555805f10][g=0] gathering=Complete candidates=1
+[2026-10-14 18:11:52.765] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555572c2a0][g=0] state New -> Checking
+[2026-10-14 18:11:52.765] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x555555805f10][g=0] state New -> Checking
+[2026-10-14 18:11:52.765] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x5555558035b0][g=0] state New -> Checking selected=0
+[2026-10-14 18:11:52.765] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x55555572d1b0][g=0] state New -> Checking selected=0
+[2026-10-14 18:11:52.773] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555572c2a0][g=0] state Checking -> Connected
+[2026-10-14 18:11:52.773] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x555555805f10][g=0] state Checking -> Connected
+[2026-10-14 18:11:52.785] [INFO ] [tid:231289] [ice_agent.cpp:657] [WebRTC][ICE agent 0x555555805f10][g=0] nominated pair=1 component=1 local=127.0.0.1:38592 remote=127.0.0.1:41947
+[2026-10-14 18:11:52.785] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x555555805f10][g=0] state Connected -> Completed
+[2026-10-14 18:11:52.785] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x55555572d1b0][g=0] state Checking -> Connected selected=1
+[2026-10-14 18:11:52.785] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x55555572d1b0][g=0] state Connected -> Completed selected=1
+[2026-10-14 18:11:52.785] [INFO ] [tid:231289] [ice_agent.cpp:657] [WebRTC][ICE agent 0x55555572c2a0][g=0] nominated pair=1 component=1 local=127.0.0.1:41947 remote=127.0.0.1:38592
+[2026-10-14 18:11:52.785] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555572c2a0][g=0] state Connected -> Completed
+[2026-10-14 18:11:52.785] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x5555558035b0][g=0] state Checking -> Connected selected=1
+[2026-10-14 18:11:52.785] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x5555558035b0][g=0] state Connected -> Completed selected=1
+[2026-10-14 18:11:52.788] [INFO ] [tid:231289] [ice_transport.cpp:195] [WebRTC][ICE transport 0x5555558035b0][g=0] DTLS ready component=1 pair=1 role=client remote=127.0.0.1:38592
+[2026-10-14 18:11:52.793] [INFO ] [tid:231289] [ice_transport.cpp:305] [WebRTC][ICE transport 0x5555558035b0][g=1] restart
+[2026-10-14 18:11:52.793] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x5555558035b0][g=1] state Completed -> New selected=0
+[2026-10-14 18:11:52.793] [INFO ] [tid:231289] [ice_transport.cpp:305] [WebRTC][ICE transport 0x55555572d1b0][g=1] restart
+[2026-10-14 18:11:52.793] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x55555572d1b0][g=1] state Completed -> New selected=0
+[2026-10-14 18:11:52.793] [INFO ] [tid:231289] [ice_agent.cpp:978] [WebRTC][ICE agent 0x55555572c2a0][g=1] restart role=controlling retained_candidates=1
+[2026-10-14 18:11:52.793] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555572c2a0][g=1] state Completed -> New
+[2026-10-14 18:11:52.793] [INFO ] [tid:231289] [ice_agent.cpp:978] [WebRTC][ICE agent 0x555555805f10][g=1] restart role=controlled retained_candidates=1
+[2026-10-14 18:11:52.793] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x555555805f10][g=1] state Completed -> New
+[2026-10-14 18:11:52.797] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x555555805f10][g=1] state New -> Checking
+[2026-10-14 18:11:52.797] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x55555572d1b0][g=1] state New -> Checking selected=0
+[2026-10-14 18:11:52.797] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555572c2a0][g=1] state New -> Checking
+[2026-10-14 18:11:52.797] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x5555558035b0][g=1] state New -> Checking selected=0
+[2026-10-14 18:11:52.807] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555572c2a0][g=1] state Checking -> Connected
+[2026-10-14 18:11:52.807] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x555555805f10][g=1] state Checking -> Connected
+[2026-10-14 18:11:52.870] [INFO ] [tid:231289] [ice_agent.cpp:657] [WebRTC][ICE agent 0x555555805f10][g=1] nominated pair=2 component=1 local=127.0.0.1:38592 remote=127.0.0.1:41947
+[2026-10-14 18:11:52.870] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x555555805f10][g=1] state Connected -> Completed
+[2026-10-14 18:11:52.870] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x55555572d1b0][g=1] state Checking -> Connected selected=1
+[2026-10-14 18:11:52.870] [INFO ] [tid:231289] [ice_transport.cpp:195] [WebRTC][ICE transport 0x55555572d1b0][g=1] DTLS ready component=1 pair=2 role=client remote=127.0.0.1:41947
+[2026-10-14 18:11:52.870] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x55555572d1b0][g=1] state Connected -> Completed selected=1
+[2026-10-14 18:11:52.870] [INFO ] [tid:231289] [ice_agent.cpp:657] [WebRTC][ICE agent 0x55555572c2a0][g=1] nominated pair=2 component=1 local=127.0.0.1:41947 remote=127.0.0.1:38592
+[2026-10-14 18:11:52.870] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555572c2a0][g=1] state Connected -> Completed
+[2026-10-14 18:11:52.870] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x5555558035b0][g=1] state Checking -> Connected selected=1
+[2026-10-14 18:11:52.870] [INFO ] [tid:231289] [ice_transport.cpp:195] [WebRTC][ICE transport 0x5555558035b0][g=1] DTLS ready component=1 pair=2 role=client remote=127.0.0.1:38592
+[2026-10-14 18:11:52.870] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x5555558035b0][g=1] state Connected -> Completed selected=1
+[2026-10-14 18:11:52.870] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x5555558035b0][g=2] state Completed -> Closed selected=0
+[2026-10-14 18:11:52.870] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x55555572d1b0][g=2] state Completed -> Closed selected=0
+[2026-10-14 18:11:52.870] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555572c2a0][g=2] state Completed -> Closed
+[2026-10-14 18:11:52.870] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x555555805f10][g=2] state Completed -> Closed
+[2026-10-14 18:11:52.870] [INFO ] [tid:231289] [ice_agent.cpp:1012] [WebRTC][ICE agent 0x55555572c2a0][g=2] closed transports=1
+[2026-10-14 18:11:52.870] [INFO ] [tid:231289] [ice_agent.cpp:1012] [WebRTC][ICE agent 0x555555805f10][g=2] closed transports=1
+[2026-10-14 18:11:52.870] [INFO ] [tid:231289] [ice_transport.cpp:342] [WebRTC][ICE transport 0x5555558035b0][g=2] closed sent=0 received=0 discarded=0 failed_sends=0
+[2026-10-14 18:11:52.870] [INFO ] [tid:231289] [ice_transport.cpp:342] [WebRTC][ICE transport 0x55555572d1b0][g=2] closed sent=0 received=0 discarded=0 failed_sends=0
+[2026-10-14 18:11:52.870] [INFO ] [tid:231289] [ice_agent.cpp:268] [WebRTC][ICE agent 0x55555572c2a0][g=0] gathering=Gathering candidates=0
+[2026-10-14 18:11:52.870] [INFO ] [tid:231289] [ice_agent.cpp:268] [WebRTC][ICE agent 0x55555572c2a0][g=0] gathering=Complete candidates=2
+[2026-10-14 18:11:52.871] [INFO ] [tid:231289] [ice_agent.cpp:268] [WebRTC][ICE agent 0x55555580a320][g=0] gathering=Gathering candidates=0
+[2026-10-14 18:11:52.871] [INFO ] [tid:231289] [ice_agent.cpp:268] [WebRTC][ICE agent 0x55555580a320][g=0] gathering=Complete candidates=2
+[2026-10-14 18:11:52.873] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555572c2a0][g=0] state New -> Checking
+[2026-10-14 18:11:52.873] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555580a320][g=0] state New -> Checking
+[2026-10-14 18:11:52.873] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x5555558035b0][g=0] state New -> Checking selected=0
+[2026-10-14 18:11:53.009] [INFO ] [tid:231289] [ice_agent.cpp:657] [WebRTC][ICE agent 0x55555572c2a0][g=0] nominated pair=1 component=1 local=127.0.0.1:50693 remote=127.0.0.1:50698
+[2026-10-14 18:11:53.010] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555572c2a0][g=0] state Checking -> Connected
+[2026-10-14 18:11:53.010] [INFO ] [tid:231289] [ice_agent.cpp:657] [WebRTC][ICE agent 0x55555580a320][g=0] nominated pair=1 component=1 local=127.0.0.1:50698 remote=127.0.0.1:50693
+[2026-10-14 18:11:53.020] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555580a320][g=0] state Checking -> Connected
+[2026-10-14 18:11:53.030] [INFO ] [tid:231289] [ice_agent.cpp:657] [WebRTC][ICE agent 0x55555572c2a0][g=0] nominated pair=2 component=2 local=127.0.0.1:54988 remote=127.0.0.1:51871
+[2026-10-14 18:11:53.030] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555572c2a0][g=0] state Connected -> Completed
+[2026-10-14 18:11:53.030] [INFO ] [tid:231289] [ice_agent.cpp:657] [WebRTC][ICE agent 0x55555580a320][g=0] nominated pair=2 component=2 local=127.0.0.1:51871 remote=127.0.0.1:54988
+[2026-10-14 18:11:53.030] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555580a320][g=0] state Connected -> Completed
+[2026-10-14 18:11:53.030] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x5555558035b0][g=0] state Checking -> Connected selected=2
+[2026-10-14 18:11:53.030] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x5555558035b0][g=0] state Connected -> Completed selected=2
+[2026-10-14 18:11:53.035] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555572c2a0][g=1] state Completed -> Closed
+[2026-10-14 18:11:53.035] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x5555558035b0][g=1] state Completed -> Closed selected=0
+[2026-10-14 18:11:53.035] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555580a320][g=1] state Completed -> Closed
+[2026-10-14 18:11:53.035] [INFO ] [tid:231289] [ice_agent.cpp:1012] [WebRTC][ICE agent 0x55555572c2a0][g=1] closed transports=2
+[2026-10-14 18:11:53.035] [INFO ] [tid:231289] [ice_agent.cpp:1012] [WebRTC][ICE agent 0x55555580a320][g=1] closed transports=2
+[2026-10-14 18:11:53.035] [INFO ] [tid:231289] [ice_transport.cpp:342] [WebRTC][ICE transport 0x5555558035b0][g=1] closed sent=0 received=1 discarded=5 failed_sends=0
+[2026-10-14 18:11:53.035] [INFO ] [tid:231289] [ice_agent.cpp:268] [WebRTC][ICE agent 0x55555580a320][g=0] gathering=Gathering candidates=0
+[2026-10-14 18:11:53.035] [INFO ] [tid:231289] [ice_agent.cpp:268] [WebRTC][ICE agent 0x55555580a320][g=0] gathering=Complete candidates=1
+[2026-10-14 18:11:53.035] [INFO ] [tid:231289] [ice_agent.cpp:268] [WebRTC][ICE agent 0x55555572c0f0][g=0] gathering=Gathering candidates=0
+[2026-10-14 18:11:53.035] [INFO ] [tid:231289] [ice_agent.cpp:268] [WebRTC][ICE agent 0x55555572c0f0][g=0] gathering=Complete candidates=1
+[2026-10-14 18:11:53.037] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555580a320][g=0] state New -> Checking
+[2026-10-14 18:11:53.037] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555572c0f0][g=0] state New -> Checking
+[2026-10-14 18:11:53.038] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x5555558035b0][g=0] state New -> Checking selected=0
+[2026-10-14 18:11:53.038] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x555555804dd0][g=0] state New -> Checking selected=0
+[2026-10-14 18:11:53.046] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555580a320][g=0] state Checking -> Connected
+[2026-10-14 18:11:53.046] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555572c0f0][g=0] state Checking -> Connected
+[2026-10-14 18:11:53.222] [INFO ] [tid:231289] [ice_agent.cpp:657] [WebRTC][ICE agent 0x55555572c0f0][g=0] nominated pair=1 component=1 local=127.0.0.1:36879 remote=127.0.0.1:44698
+[2026-10-14 18:11:53.222] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555572c0f0][g=0] state Connected -> Completed
+[2026-10-14 18:11:53.222] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x555555804dd0][g=0] state Checking -> Connected selected=1
+[2026-10-14 18:11:53.222] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x555555804dd0][g=0] state Connected -> Completed selected=1
+[2026-10-14 18:11:53.222] [INFO ] [tid:231289] [ice_agent.cpp:657] [WebRTC][ICE agent 0x55555580a320][g=0] nominated pair=1 component=1 local=127.0.0.1:44698 remote=127.0.0.1:36879
+[2026-10-14 18:11:53.222] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555580a320][g=0] state Connected -> Completed
+[2026-10-14 18:11:53.222] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x5555558035b0][g=0] state Checking -> Connected selected=1
+[2026-10-14 18:11:53.222] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x5555558035b0][g=0] state Connected -> Completed selected=1
+[2026-10-14 18:11:53.223] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x555555804dd0][g=1] state Completed -> Closed selected=0
+[2026-10-14 18:11:53.223] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x5555558035b0][g=1] state Completed -> Closed selected=0
+[2026-10-14 18:11:53.223] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555572c0f0][g=1] state Completed -> Closed
+[2026-10-14 18:11:53.223] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555580a320][g=1] state Completed -> Closed
+[2026-10-14 18:11:53.224] [INFO ] [tid:231289] [ice_agent.cpp:1012] [WebRTC][ICE agent 0x55555572c0f0][g=1] closed transports=1
+[2026-10-14 18:11:53.224] [INFO ] [tid:231289] [ice_transport.cpp:342] [WebRTC][ICE transport 0x555555804dd0][g=1] closed sent=0 received=0 discarded=0 failed_sends=0
+[2026-10-14 18:11:53.224] [INFO ] [tid:231289] [ice_agent.cpp:1012] [WebRTC][ICE agent 0x55555580a320][g=1] closed transports=1
+[2026-10-14 18:11:53.224] [INFO ] [tid:231289] [ice_transport.cpp:342] [WebRTC][ICE transport 0x5555558035b0][g=1] closed sent=2 received=0 discarded=0 failed_sends=18
+[2026-10-14 18:11:53.224] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x55555580ad60][g=1] state New -> Closed selected=0
+[2026-10-14 18:11:53.224] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555580b3f0][g=1] state New -> Closed
+[2026-10-14 18:11:53.224] [INFO ] [tid:231289] [ice_agent.cpp:1012] [WebRTC][ICE agent 0x55555580b3f0][g=1] closed transports=0
+[2026-10-14 18:11:53.224] [INFO ] [tid:231289] [ice_transport.cpp:342] [WebRTC][ICE transport 0x55555580ad60][g=1] closed sent=0 received=0 discarded=0 failed_sends=0
+[2026-10-14 18:11:53.227] [INFO ] [tid:231289] [ice_agent.cpp:268] [WebRTC][ICE agent 0x55555580c100][g=0] gathering=Gathering candidates=0
+[2026-10-14 18:11:53.227] [INFO ] [tid:231289] [ice_agent.cpp:268] [WebRTC][ICE agent 0x55555580c100][g=0] gathering=Complete candidates=1
+[2026-10-14 18:11:53.230] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x55555580ba70][g=1] state New -> Closed selected=0
+[2026-10-14 18:11:53.230] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555580c100][g=1] state New -> Closed
+[2026-10-14 18:11:53.230] [INFO ] [tid:231289] [ice_agent.cpp:1012] [WebRTC][ICE agent 0x55555580c100][g=1] closed transports=1
+[2026-10-14 18:11:53.230] [INFO ] [tid:231289] [ice_transport.cpp:342] [WebRTC][ICE transport 0x55555580ba70][g=1] closed sent=0 received=0 discarded=0 failed_sends=0
+[2026-10-14 18:11:53.230] [INFO ] [tid:231289] [ice_transport.cpp:305] [WebRTC][ICE transport 0x55555580d1e0][g=1] restart
+[2026-10-14 18:11:53.230] [INFO ] [tid:231289] [ice_agent.cpp:978] [WebRTC][ICE agent 0x55555580d870][g=1] restart role=controlled retained_candidates=0
+[2026-10-14 18:11:53.230] [INFO ] [tid:231289] [ice_transport.cpp:177] [WebRTC][ICE transport 0x55555580d1e0][g=2] state New -> Closed selected=0
+[2026-10-14 18:11:53.230] [INFO ] [tid:231289] [ice_agent.cpp:261] [WebRTC][ICE agent 0x55555580d870][g=2] state New -> Closed
+[2026-10-14 18:11:53.230] [INFO ] [tid:231289] [ice_agent.cpp:1012] [WebRTC][ICE agent 0x55555580d870][g=2] closed transports=0
+[2026-10-14 18:11:53.230] [INFO ] [tid:231289] [ice_transport.cpp:342] [WebRTC][ICE transport 0x55555580d1e0][g=2] closed sent=0 received=0 discarded=0 failed_sends=0
+[2026-10-14 18:11:53.230] [INFO ] [tid:231335] [ice_agent.cpp:268] [WebRTC][ICE agent 0x555555803400][g=0] gathering=Gathering candidates=0
+[2026-10-14 18:11:53.230] [INFO ] [tid:231335] [ice_agent.cpp:268] [WebRTC][ICE agent 0x555555803400][g=0] gathering=Complete candidates=1
+[2026-10-14 18:11:53.230] [INFO ] [tid:231336] [ice_agent.cpp:261] [WebRTC][ICE agent 0x555555803400][g=0] state New -> Checking
+[2026-10-14 18:11:53.231] [INFO ] [tid:231336] [ice_transport.cpp:177] [WebRTC][ICE transport 0x55555580a320][g=0] state New -> Checking selected=0
+[2026-10-14 18:11:53.231] [INFO ] [tid:231336] [ice_transport.cpp:177] [WebRTC][ICE transport 0x55555580a320][g=1] state Checking -> Closed selected=0
+[2026-10-14 18:11:53.231] [INFO ] [tid:231336] [ice_agent.cpp:261] [WebRTC][ICE agent 0x555555803400][g=1] state Checking -> Closed
+[2026-10-14 18:11:53.231] [INFO ] [tid:231336] [ice_agent.cpp:1012] [WebRTC][ICE agent 0x555555803400][g=1] closed transports=1
+[2026-10-14 18:11:53.231] [INFO ] [tid:231336] [ice_transport.cpp:342] [WebRTC][ICE transport 0x55555580a320][g=1] closed sent=0 received=0 discarded=0 failed_sends=0

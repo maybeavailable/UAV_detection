@@ -37,7 +37,7 @@ struct IceTransportPacket
     std::uint64_t generation{0};
     std::uint16_t component{1};
     IcePacketType type{IcePacketType::Unknown};
-    UdpSocket::Datagram datagram; // 拥有数据、源端点和接收时间；仍是加密的 DTLS / SRTP / SRTCP
+    UdpSocket::Datagram datagram; // 拥有数据、源端点和接收时间；ICE 输入是密文，上层认证解密后保留元数据
 };
 struct IceTransportStats
 {

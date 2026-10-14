@@ -49,17 +49,6 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
-    },
-    {
-      "name": "native",
-      "displayName": "本机 x86_64（不含昇腾环境）",
-      "description": "宿主机原生编译，用于在本机调试与测试不依赖昇腾的模块（log / rtsp 等）",
-      "generator": "Unix Makefiles",
-      "binaryDir": "${sourceDir}/build/native",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "UAV_ASCEND": "OFF"
-      }
     }
   ],
   "buildPresets": [
@@ -78,10 +67,6 @@
     {
       "name": "ascend-aarch64-release",
       "configurePreset": "ascend-aarch64-release"
-    },
-    {
-      "name": "native",
-      "configurePreset": "native"
     }
   ],
   "testPresets": [

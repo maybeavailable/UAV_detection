@@ -1,4 +1,5 @@
 #include"webrtc/ice_transport.h"
+#include"log/log.h"
 
 #include<boost/asio/post.hpp>
 #include<boost/asio/strand.hpp>
@@ -16,6 +17,16 @@ namespace webrtc
 namespace net = boost::asio;
 namespace
 {
+const char* stateName(IceTransportState state)
+{
+    switch (state)
+    {
+    case IceTransportState::New: return "New"; case IceTransportState::Checking: return "Checking";
+    case IceTransportState::Connected: return "Connected"; case IceTransportState::Completed: return "Completed";
+    case IceTransportState::Disconnected: return "Disconnected"; case IceTransportState::Failed: return "Failed"; case IceTransportState::Closed: return "Closed";
+    }
+    return "Unknown";
+}
 bool applicationPacket(IcePacketType type)
 {
     return type == IcePacketType::Dtls || type == IcePacketType::Rtp || type == IcePacketType::Rtcp;
@@ -163,6 +174,8 @@ struct IceTransport::Impl : std::enable_shared_from_this<IceTransport::Impl>
         current.ice = std::move(source);
         current.state = deriveState(current.ice);
         publish();
+        if (previous != current.state) UAV_LOG_INFO << "[WebRTC][ICE transport " << this << "][g=" << current.generation << "] state "
+            << stateName(previous) << " -> " << stateName(current.state) << " selected=" << current.ice.selectedPairs.size();
         if (previous != current.state && callbacks.onState) callbacks.onState(current.state);
         if (notifiedGathering != current.ice.gatheringState)
         {
@@ -179,6 +192,8 @@ struct IceTransport::Impl : std::enable_shared_from_this<IceTransport::Impl>
             auto& notified = dtlsNotified[choice.local.component];
             if (notified == choice.id) continue;
             notified = choice.id;
+            UAV_LOG_INFO << "[WebRTC][ICE transport " << this << "][g=" << current.generation << "] DTLS ready component=" << choice.local.component
+                << " pair=" << choice.id << " role=" << (current.dtls->localSetup == SdpSetupRole::Active ? "client" : "server") << " remote=" << choice.remoteEndpoint;
             if (callbacks.onDtlsReady) callbacks.onDtlsReady({current.generation, choice, *current.dtls});
         }
     }
@@ -287,6 +302,7 @@ struct IceTransport::Impl : std::enable_shared_from_this<IceTransport::Impl>
         { complete(done, net::error::invalid_argument); return; }
         restarting = true;
         const auto generation = epoch.fetch_add(1, std::memory_order_relaxed) + 1;
+        UAV_LOG_INFO << "[WebRTC][ICE transport " << this << "][g=" << generation << "] restart";
         dtlsNotified.clear(); current.dtls.reset();
         current.ice.selectedPairs.clear();
         synchronize(current.ice);
@@ -323,6 +339,8 @@ struct IceTransport::Impl : std::enable_shared_from_this<IceTransport::Impl>
     {
         if (closed || !closing || !closeConfirmed || pendingSends) return;
         closed = true;
+        UAV_LOG_INFO << "[WebRTC][ICE transport " << this << "][g=" << current.generation << "] closed sent=" << current.stats.sentPackets
+            << " received=" << current.stats.receivedPackets << " discarded=" << current.stats.discardedPackets << " failed_sends=" << current.stats.failedSends;
         auto done = std::move(closeCallbacks); closeCallbacks.clear();
         for (const auto& callback : done) complete(callback);
     }

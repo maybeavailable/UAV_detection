@@ -267,11 +267,32 @@ PKG_CONFIG_ARGN:STRING=
 //pkg-config executable
 PKG_CONFIG_EXECUTABLE:FILEPATH=/usr/bin/pkg-config
 
+//Path to a file.
+SRTP_INCLUDE_DIR:PATH=/home/huangquan/code/UAV_detection/third_party/libsrtp/include
+
+//Path to a library.
+SRTP_LIBRARY:FILEPATH=/home/huangquan/code/UAV_detection/third_party/libsrtp/lib/libsrtp2.a
+
 //使用当前系统的昇腾（CANN/ACL）编译环境
 UAV_ASCEND:BOOL=ON
 
+//构建 HTTP / WebSocket Gateway
+UAV_GATEWAY:BOOL=ON
+
+//仅构建 Gateway，不查找板端媒体和国标依赖
+UAV_GATEWAY_ONLY:BOOL=OFF
+
+//构建并注册 Gateway 主机集成测试
+UAV_GATEWAY_TESTS:BOOL=OFF
+
 //启用 GB28181 国标接入（XML 报文 + eXosip2 SIP 信令）
 UAV_GB28181:BOOL=ON
+
+//仅构建 RTSP，不查找板端和 SIP 依赖
+UAV_RTSP_ONLY:BOOL=OFF
+
+//构建并注册 RTSP 主机回归测试
+UAV_RTSP_TESTS:BOOL=OFF
 
 //Value Computed by CMake
 UAV_detection_BINARY_DIR:STATIC=/home/huangquan/code/UAV_detection
@@ -281,6 +302,12 @@ UAV_detection_IS_TOP_LEVEL:STATIC=ON
 
 //Value Computed by CMake
 UAV_detection_SOURCE_DIR:STATIC=/home/huangquan/code/UAV_detection
+
+//Path to a file.
+USRSCTP_INCLUDE_DIR:PATH=/home/huangquan/code/UAV_detection/third_party/usrsctp/include
+
+//Path to a library.
+USRSCTP_LIBRARY:FILEPATH=/home/huangquan/code/UAV_detection/third_party/usrsctp/lib/libusrsctp.a
 
 //Path to a program.
 _ascend_ar:FILEPATH=/usr/bin/aarch64-linux-gnu-ar
@@ -413,7 +440,7 @@ CMAKE_MODULE_LINKER_FLAGS_RELWITHDEBINFO-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_NM
 CMAKE_NM-ADVANCED:INTERNAL=1
 //number of local generators
-CMAKE_NUMBER_OF_MAKEFILES:INTERNAL=1
+CMAKE_NUMBER_OF_MAKEFILES:INTERNAL=2
 //ADVANCED property for variable: CMAKE_OBJCOPY
 CMAKE_OBJCOPY-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: CMAKE_OBJDUMP
@@ -468,8 +495,12 @@ FIND_PACKAGE_MESSAGE_DETAILS_EXosip2:INTERNAL=[/home/huangquan/code/UAV_detectio
 FIND_PACKAGE_MESSAGE_DETAILS_LibXml2:INTERNAL=[/home/huangquan/code/UAV_detection/third_party/libxml2/lib/libxml2.a][/home/huangquan/code/UAV_detection/third_party/libxml2/include/libxml2][v2.9.13(2.9)]
 //Details about finding OpenSSL
 FIND_PACKAGE_MESSAGE_DETAILS_OpenSSL:INTERNAL=[/home/huangquan/code/UAV_detection/third_party/openssl/lib/libcrypto.a][/home/huangquan/code/UAV_detection/third_party/openssl/include][c ][v3.5.9()]
+//Details about finding SRTP
+FIND_PACKAGE_MESSAGE_DETAILS_SRTP:INTERNAL=[/home/huangquan/code/UAV_detection/third_party/libsrtp/include][/home/huangquan/code/UAV_detection/third_party/libsrtp/lib/libsrtp2.a][v()]
 //Details about finding Threads
 FIND_PACKAGE_MESSAGE_DETAILS_Threads:INTERNAL=[TRUE][v()]
+//Details about finding USRSCTP
+FIND_PACKAGE_MESSAGE_DETAILS_USRSCTP:INTERNAL=[/home/huangquan/code/UAV_detection/third_party/usrsctp/include][/home/huangquan/code/UAV_detection/third_party/usrsctp/lib/libusrsctp.a][v()]
 //ADVANCED property for variable: LIBXML2_INCLUDE_DIR
 LIBXML2_INCLUDE_DIR-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: LIBXML2_LIBRARY
@@ -527,8 +558,20 @@ PC_LIBXML_libxml-2.0_VERSION:INTERNAL=
 PKG_CONFIG_ARGN-ADVANCED:INTERNAL=1
 //ADVANCED property for variable: PKG_CONFIG_EXECUTABLE
 PKG_CONFIG_EXECUTABLE-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: SRTP_INCLUDE_DIR
+SRTP_INCLUDE_DIR-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: SRTP_LIBRARY
+SRTP_LIBRARY-ADVANCED:INTERNAL=1
 //上次配置使用的 LibXml2_ROOT
 UAV_LIBXML2_ROOT_USED:INTERNAL=/home/huangquan/code/UAV_detection/third_party/libxml2
+//上次查找使用的 SRTP_ROOT
+UAV_SRTP_ROOT_USED:INTERNAL=/home/huangquan/code/UAV_detection/cmake/../third_party/libsrtp
+//上次查找使用的 USRSCTP_ROOT
+UAV_USRSCTP_ROOT_USED:INTERNAL=/home/huangquan/code/UAV_detection/cmake/../third_party/usrsctp
+//ADVANCED property for variable: USRSCTP_INCLUDE_DIR
+USRSCTP_INCLUDE_DIR-ADVANCED:INTERNAL=1
+//ADVANCED property for variable: USRSCTP_LIBRARY
+USRSCTP_LIBRARY-ADVANCED:INTERNAL=1
 _OPENSSL_CFLAGS:INTERNAL=
 _OPENSSL_CFLAGS_I:INTERNAL=
 _OPENSSL_CFLAGS_OTHER:INTERNAL=
