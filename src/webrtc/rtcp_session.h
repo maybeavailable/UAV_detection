@@ -1,6 +1,7 @@
 #pragma once
 
 #include"webrtc/rtcp_protocol.h"
+#include"webrtc/transport_adapter.h"
 #include<chrono>
 #include<functional>
 #include<memory>
@@ -48,6 +49,7 @@ struct TwccPacketResult
     std::chrono::steady_clock::time_point sentAt;
     // Receiver's clock, unwrapped across reference-time rollover; NOT local wall clock.
     std::optional<std::int64_t> remoteArrivalUs;
+    bool ambiguousReceiveTime{false};
 };
 struct TwccFeedbackEvent
 {
@@ -55,6 +57,8 @@ struct TwccFeedbackEvent
     std::uint8_t feedbackCount{0};
     std::vector<TwccPacketResult> packets; // only known history entries with changed status
     std::size_t received{0}, notReceived{0}, receivedBytes{0};
+    std::chrono::steady_clock::time_point feedbackAt{};
+    std::vector<TransportPacketDelta> packetDeltas;
 };
 struct RtcpStats
 {
@@ -65,6 +69,7 @@ struct RtcpStats
     std::uint64_t sentTwcc{0}, receivedTwcc{0}, malformedPackets{0}, droppedOutputs{0};
     std::size_t sendStreams{0}, receiveStreams{0}, cachedPackets{0}, cachedBytes{0}, twccHistory{0};
     std::optional<double> lastRttMs;
+    TransportAdapterStats transport;
 };
 
 // Synchronous RTCP engine, owned and serialized by DtlsTransport's strand.
@@ -92,8 +97,9 @@ public:
         std::function<void(RtcpNackEvent)> onNack;
         std::function<void(RtcpKeyFrameEvent)> onKeyFrameRequest;
         std::function<void(TwccFeedbackEvent)> onTwccFeedback;
+        std::function<void(TransportPacketsFeedback)> onTransportFeedback;
     };
-    struct Output { RtcpBytes bytes; bool retransmission{false}; }; // retransmission is already SRTP ciphertext
+    struct Output { RtcpBytes bytes; bool retransmission{false}; std::optional<std::int64_t> transportSequence; }; // retransmission is already SRTP ciphertext
     explicit RtcpSession(Config config, Callbacks callbacks = {});
     ~RtcpSession();
     RtcpSession(const RtcpSession&) = delete;
@@ -101,7 +107,14 @@ public:
     bool configure(RtcpParameters parameters); // rejects conflicting bundled PT/extension mappings
     bool prepareRtp(RtcpBytes& plaintext); // adds negotiated association-wide TWCC sequence
     bool reserveRtpExtensions(RtcpBytes& plaintext); // reserves space before queuing; doesn't consume a TWCC sequence
-    void sentRtp(const RtcpBytes& plaintext, RtcpBytes ciphertext, Time sentAt);
+    // Register submission before the Sender can synchronously return feedback.
+    std::optional<std::int64_t> sendingRtp(const RtcpBytes& plaintext, std::size_t wireSize, Time createdAt, Time sentAt, std::size_t overheadBytes = 0);
+    void retransmittedRtp(std::int64_t transportSequence, Time sentAt);
+    void failedRtp(std::int64_t transportSequence);
+    // Success-only SR statistics/cache. Direct users can also register the send here;
+    // Transport callers pass recordTransport=false and the full id returned by sendingRtp().
+    void sentRtp(const RtcpBytes& plaintext, RtcpBytes ciphertext, Time sentAt, bool recordTransport = true,
+        std::optional<std::int64_t> transportSequence = {});
     void receivedRtp(const RtcpBytes& plaintext, Time arrival);
     bool receivedRtcp(const RtcpBytes& plaintext, Time arrival);
     bool requestPli(std::uint32_t mediaSsrc, Time now); // false if unknown/unnegotiated/rate limited

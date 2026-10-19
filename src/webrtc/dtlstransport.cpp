@@ -281,6 +281,7 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
         bool finished{false};
         Bytes trackedPlaintext, trackedCiphertext;
         Clock::time_point sentAt;
+        std::optional<std::int64_t> transportSequence;
         Bytes payload; // plaintext until paced release; retransmissions are already ciphertext
         std::uint64_t id{0}, version{0}, generation{0};
         std::size_t reservationSize{0};
@@ -343,7 +344,7 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
             {
                 config.rtcp.maxDatagramSize = std::min(config.rtcp.maxDatagramSize, config.mtu - 20);
                 rtcp = std::make_unique<RtcpSession>(config.rtcp, RtcpSession::Callbacks{
-                    callbacks.onReceiverReport, callbacks.onNack, callbacks.onKeyFrameRequest, callbacks.onTwccFeedback});
+                    callbacks.onReceiverReport, callbacks.onNack, callbacks.onKeyFrameRequest, callbacks.onTwccFeedback, callbacks.onTransportFeedback});
             }
         }
         if (!config.certificate) config.certificate = DtlsCertificate::generate();
@@ -788,7 +789,7 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
                         if (ec && !flush->error) flush->error = ec;
                         if (--flush->remaining == 0) complete(flush->done, flush->error);
                     }
-                }, packet.retransmission);
+                }, packet.retransmission, packet.transportSequence);
     }
     void armRtcp()
     {
@@ -861,8 +862,10 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
             if (!ec && size != write->ciphertextSize) ec = net::error::message_size;
         }
         if (closing || write->version != session) ec = net::error::operation_aborted;
+        if (ec && rtcp && write->transportSequence && !write->retransmission && write->version == session)
+            rtcp->failedRtp(*write->transportSequence);
         if (!ec && !write->finished && rtcp && !write->trackedPlaintext.empty())
-            rtcp->sentRtp(write->trackedPlaintext, std::move(write->trackedCiphertext), write->sentAt);
+            rtcp->sentRtp(write->trackedPlaintext, std::move(write->trackedCiphertext), write->sentAt, false, write->transportSequence);
         publish(); finishMediaWrite(write, ec);
         if (closing) finishClose();
     }
@@ -888,6 +891,13 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
         if (!write->trackedPlaintext.empty()) write->trackedCiphertext = bytes;
         // Timestamp at paced egress, after crypto, immediately before submitting to the UDP Sender.
         write->sentAt = Clock::now(); write->submitted = true; ++wirePending;
+        if (rtcp && !write->control)
+        {
+            if (write->retransmission)
+            { if (write->transportSequence) rtcp->retransmittedRtp(*write->transportSequence, write->sentAt); }
+            else write->transportSequence = rtcp->sendingRtp(write->trackedPlaintext, bytes.size(), write->sentAt, write->sentAt,
+                config.pacer.transportOverheadBytes);
+        }
         const auto self = shared_from_this();
         SendHandler finish = [self, write](ErrorCode result, std::size_t size) {
             net::post(self->strand, [self, write, result, size] { self->releaseMedia(write, result, size); });
@@ -947,7 +957,8 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
         }
         complete(done, ec);
     }
-    void sendMedia(Bytes bytes, bool control, std::optional<std::uint64_t> generation, SendHandler done, bool retransmission = false)
+    void sendMedia(Bytes bytes, bool control, std::optional<std::uint64_t> generation, SendHandler done, bool retransmission = false,
+        std::optional<std::int64_t> retransmissionSequence = {})
     {
         ErrorCode ec;
         const auto plainSize = bytes.size();
@@ -969,6 +980,7 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
         if (ec) { if (done) done(ec, 0); return; }
         // Reserve queue storage before consuming SRTP/TWCC sequences; actual crypto runs at egress.
         auto write = std::make_shared<MediaWrite>();
+        write->transportSequence = retransmissionSequence;
         write->plaintextSize = plainSize; write->done = std::move(done); write->payload = std::move(bytes);
         write->id = ++nextMediaId; write->version = session; write->generation = current.generation;
         write->control = control; write->retransmission = retransmission;

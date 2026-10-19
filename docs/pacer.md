@@ -55,7 +55,7 @@ peer.setPacingRate(0);
 
 入队时只校验 RTP 并预留 TWCC 扩展空间，出队时才分配 transport sequence、执行 SRTP 加密，再提交到 UDP Sender。TWCC 时间戳在加密后、交给 ICE Sender 前采样，**不包含 pacer 排队时间**；它是用户态提交时间，不是内核发送时间戳。实际 Sender 成功完成后才记录媒体发送统计/重传历史。失败、超时和取消回调返回 0 字节，成功返回调用者原始 RTP 明文长度。
 
-缓存 NACK 重传经过相同 pacer，沿用原始 SRTP 密文，不再次保护或更改其 TWCC 序号。后续带宽估计器应识别这些重传，避免把原始包的发送时间与重传到达时间作为普通延迟样本；独立 RTX 封装仍待实现。
+缓存 NACK 重传经过相同 pacer，沿用原始 SRTP 密文，不再次保护或更改其 TWCC 序号。[Transport adapter](transport-adapter.md) 更新该记录的发送时间并标记接收时间歧义，间隔辅助计算会跳过这些包；独立 RTX 封装仍待实现。
 
 ICE restart 清理旧代排队包和预算，重置 pacer 统计/代次，保留当前配置速率与暂停状态。已经提交给 Sender 的旧包继续等待一次完成回调；迟到完成不写入新代媒体统计。失败、关闭停止定时器并取消排队包，close 等待真正提交的输出完成。普通 SDP 重协商保留 pacer 队列与预算。
 

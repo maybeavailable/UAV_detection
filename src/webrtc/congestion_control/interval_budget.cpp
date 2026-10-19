@@ -1,3 +1,5 @@
+// Copyright (c) 2016 The WebRTC project authors. All Rights Reserved.
+// C++17 adaptation; see third_party/webrtc/LICENSE, PATENTS and NOTICE.
 #include"webrtc/congestion_control/interval_budget.h"
 
 #include<algorithm>
@@ -5,7 +7,8 @@
 
 namespace webrtc
 {
-IntervalBudget::IntervalBudget(std::uint64_t rate, bool accumulate) : canBuildUpUnderuse_(accumulate)
+IntervalBudget::IntervalBudget(std::uint64_t rate, bool accumulate, Rounding rounding)
+    : canBuildUpUnderuse_(accumulate), rounding_(rounding)
 {
     if (!setTargetRate(rate)) throw std::invalid_argument("invalid interval budget rate");
 }
@@ -21,12 +24,13 @@ bool IntervalBudget::setTargetRate(std::uint64_t rate)
 void IntervalBudget::increaseBudget(std::chrono::microseconds elapsed)
 {
     if (elapsed.count() <= 0 || !rateBps_) return;
-    // More than a window cannot leave additional credit or repay additional debt.
-    const auto us = static_cast<std::uint64_t>(std::min(elapsed, std::chrono::microseconds(Window)).count());
+    // From the lowest debt to the highest credit takes two windows. Capping
+    // elapsed here only prevents overflow; Pacer separately caps late ticks.
+    const auto us = static_cast<std::uint64_t>(std::min(elapsed, std::chrono::microseconds(2 * Window)).count());
     constexpr std::uint64_t byteUnits = 8000000;
     const auto earned = rateBps_ * us + fractional_;
     const auto bytes = static_cast<std::int64_t>(earned / byteUnits);
-    fractional_ = earned % byteUnits;
+    fractional_ = rounding_ == Rounding::CarryFractionalBytes ? earned % byteUnits : 0;
     remaining_ = std::min(limit_, bytes + ((remaining_ < 0 || canBuildUpUnderuse_) ? remaining_ : 0));
 }
 void IntervalBudget::useBudget(std::size_t bytes)

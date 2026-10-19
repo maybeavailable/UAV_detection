@@ -78,10 +78,7 @@ struct RtcpSession::Impl
     struct Cached
     {
         std::uint32_t ssrc; std::uint16_t sequence; RtcpBytes bytes; Time sentAt, lastRetransmit{}; unsigned retries{0};
-    };
-    struct History
-    {
-        TwccPacketResult packet; std::optional<bool> acknowledged;
+        std::optional<std::int64_t> transportSequence;
     };
     Config config; Callbacks callbacks; RtcpParameters parameters;
     RtcpStats stats;
@@ -89,15 +86,16 @@ struct RtcpSession::Impl
     std::map<std::uint32_t, Sender> senders;
     std::map<std::uint32_t, Receiver> receivers;
     std::deque<Cached> cache;
-    std::map<std::int64_t, History> history;
+    TransportFeedbackAdapter transport;
+    TransportFeedbackDeltaCalculator transportDeltas;
     std::map<std::int64_t, std::int64_t> arrivals, lateArrivals;
     std::vector<Output> output;
     std::optional<Time> reportAt, twccAt;
     std::int64_t nextTransport{0}, twccHighest{0}, twccCursor{0};
-    std::optional<std::int64_t> remoteReference;
     std::uint8_t feedbackCount{0}; bool twccInitialized{false};
 
-    Impl(Config c, Callbacks cb) : config(std::move(c)), callbacks(std::move(cb))
+    Impl(Config c, Callbacks cb) : config(std::move(c)), callbacks(std::move(cb)),
+        transport(TransportFeedbackAdapter::Config{config.historyAge, config.maxTwccHistory})
     {
         if (config.reportInterval.count() < 10 || config.tickInterval.count() < 1 || config.tickInterval.count() > 1000 ||
             config.twccInterval.count() < 5 || config.nackDelay.count() < 0 || config.nackRetry.count() < 1 ||
@@ -118,7 +116,7 @@ struct RtcpSession::Impl
         // Preserve counters across renegotiation, but discard history for removed capabilities/streams.
         for (auto it = senders.begin(); it != senders.end();) if (!find(it->second.pt, true)) it = senders.erase(it); else ++it;
         for (auto it = receivers.begin(); it != receivers.end();) if (!find(it->second.pt, false)) it = receivers.erase(it); else ++it;
-        cache.clear(); stats.cachedBytes = 0; history.clear(); arrivals.clear(); lateArrivals.clear(); twccInitialized = false;
+        cache.clear(); stats.cachedBytes = 0; transport.Clear(); transportDeltas.Reset(); arrivals.clear(); lateArrivals.clear(); twccInitialized = false;
         output.clear(); return true;
     }
     const RtcpMediaParameters* find(std::uint8_t pt, bool send) const
@@ -126,11 +124,11 @@ struct RtcpSession::Impl
         const auto it = media.find(pt);
         return it != media.end() && (send ? it->second.send : it->second.receive) ? &it->second : nullptr;
     }
-    bool queue(RtcpBytes bytes, bool retransmission = false)
+    bool queue(RtcpBytes bytes, bool retransmission = false, std::optional<std::int64_t> transportSequence = {})
     {
         if (output.size() >= config.maxOutputPackets || (!retransmission && bytes.size() > config.maxDatagramSize))
         { ++stats.droppedOutputs; return false; }
-        output.push_back({std::move(bytes), retransmission}); return true;
+        output.push_back({std::move(bytes), retransmission, transportSequence}); return true;
     }
     RtcpBytes feedbackPrefix() const
     {
@@ -142,7 +140,7 @@ struct RtcpSession::Impl
     {
         while (!cache.empty() && (now - cache.front().sentAt > config.historyAge || cache.size() > config.maxCachedPackets || stats.cachedBytes > config.maxCachedBytes))
         { stats.cachedBytes -= cache.front().bytes.size(); cache.pop_front(); }
-        while (!history.empty() && (history.size() > config.maxTwccHistory || now - history.begin()->second.packet.sentAt > config.historyAge)) history.erase(history.begin());
+        transport.Prune(now);
         for (auto& entry : senders)
             for (auto it = entry.second.reports.begin(); it != entry.second.reports.end();)
                 if (now - it->second > std::chrono::seconds(60)) it = entry.second.reports.erase(it); else ++it;
@@ -157,23 +155,29 @@ struct RtcpSession::Impl
         if (assignSequence) ++nextTransport;
         return true;
     }
-    void sent(const RtcpBytes& bytes, RtcpBytes wire, Time now)
+    std::optional<std::int64_t> sending(const RtcpBytes& bytes, std::size_t wireSize, Time created, Time now, std::size_t overhead)
+    {
+        if (!config.enabled) return std::nullopt;
+        RtpPacketParser r(bytes.data(), bytes.size()); if (!r.valid()) return std::nullopt;
+        const auto* m = find(r.payloadType(), true);
+        if (!m || !m->transportCc || !m->sendTwccExtension) return std::nullopt;
+        const auto seq = rtpTransportSequence(bytes, *m->sendTwccExtension); if (!seq) return std::nullopt;
+        if (!transport.AddPacket({*seq, wireSize, r.ssrc(), r.sequenceNumber(), m->audio, false}, {}, overhead, created)) return std::nullopt;
+        const auto sent = transport.ProcessSentPacket({*seq, now, {true, true, wireSize}});
+        return sent ? std::optional<std::int64_t>(sent->sequence_number) : std::nullopt;
+    }
+    void sent(const RtcpBytes& bytes, RtcpBytes wire, Time now, bool recordTransport, std::optional<std::int64_t> transportSequence)
     {
         if (!config.enabled) return;
         RtpPacketParser r(bytes.data(), bytes.size()); if (!r.valid()) return;
         const auto* m = find(r.payloadType(), true); if (!m) return;
+        if (recordTransport) transportSequence = sending(bytes, wire.size(), now, now, 0);
         if (!senders.count(r.ssrc()) && senders.size() >= config.maxStreams) return;
         auto& s = senders[r.ssrc()]; s.pt = r.payloadType(); s.rate = m->clockRate; s.timestamp = r.timestamp(); s.lastSend = now;
         ++s.packets; s.octets += r.payloadSize(); activity(now);
-        if (m->transportCc && m->sendTwccExtension)
-            if (const auto seq = rtpTransportSequence(bytes, *m->sendTwccExtension))
-            {
-                const auto extended = unwrap(*seq, nextTransport - 1, 16);
-                history[extended] = {{static_cast<std::uint64_t>(extended), r.ssrc(), r.sequenceNumber(), wire.size(), now, std::nullopt}, std::nullopt};
-            }
         if (m->nack && wire.size() <= config.maxCachedBytes)
         {
-            stats.cachedBytes += wire.size(); cache.push_back({r.ssrc(), r.sequenceNumber(), std::move(wire), now, {}, 0});
+            stats.cachedBytes += wire.size(); cache.push_back({r.ssrc(), r.sequenceNumber(), std::move(wire), now, {}, 0, transportSequence});
         }
         prune(now);
     }
@@ -242,7 +246,7 @@ struct RtcpSession::Impl
             auto it = std::find_if(cache.rbegin(), cache.rend(), [&](const auto& p) { return p.ssrc == f.mediaSsrc && p.sequence == seq; });
             if (it == cache.rend()) { event.cacheMisses.push_back(seq); ++stats.cacheMisses; continue; }
             if (it->retries >= config.maxNackRetries || (it->retries && now - it->lastRetransmit < config.nackDelay)) continue;
-            if (queue(it->bytes, true)) { ++it->retries; it->lastRetransmit = now; ++stats.retransmissions; }
+            if (queue(it->bytes, true, it->transportSequence)) { ++it->retries; it->lastRetransmit = now; ++stats.retransmissions; }
         }
         UAV_LOG_DEBUG << "[WebRTC][RTCP][g=" << stats.generation << "] NACK ssrc=" << f.mediaSsrc
             << " requested=" << f.sequences.size() << " cache_misses=" << event.cacheMisses.size();
@@ -288,30 +292,30 @@ struct RtcpSession::Impl
             if (callbacks.onReport) callbacks.onReport(std::move(event));
         }
     }
-    void twccFeedback(const RtcpTwcc& f)
+    void twccFeedback(const RtcpTwcc& f, Time now)
     {
-        if (history.empty()) return;
-        const auto base = unwrap(f.baseSequence, history.rbegin()->first, 16);
-        auto reference = remoteReference ? unwrap(f.referenceTime, *remoteReference, 24) :
-            (f.referenceTime & 0x800000 ? std::int64_t(f.referenceTime) - 0x1000000 : std::int64_t(f.referenceTime));
-        auto arrival = reference * 64000; TwccFeedbackEvent event; event.generation = stats.generation; event.feedbackCount = f.feedbackCount;
-        for (std::size_t i = 0; i < f.deltas.size(); ++i)
+        auto feedback = transport.ProcessTransportFeedback(f, now); if (!feedback) return;
+        TwccFeedbackEvent event; event.generation = stats.generation; event.feedbackCount = f.feedbackCount; event.feedbackAt = now;
+        event.packetDeltas = transportDeltas.Calculate(*feedback);
+        for (const auto& p : feedback->packet_feedbacks)
         {
-            if (f.deltas[i]) arrival += std::int64_t(*f.deltas[i]) * 250;
-            const auto it = history.find(base + static_cast<std::int64_t>(i)); if (it == history.end()) continue;
-            auto& h = it->second; const bool received = f.deltas[i].has_value();
-            if (h.acknowledged && (*h.acknowledged || !received)) continue;
-            h.acknowledged = received;
-            auto packet = h.packet; if (received) { packet.remoteArrivalUs = arrival; ++event.received; event.receivedBytes += packet.wireSize; }
+            // Keep the existing callback's changed-status view. The new raw
+            // TransportPacketsFeedback view follows upstream repeated-loss semantics.
+            if (!p.IsReceived() && !p.reported_lost_for_the_first_time) continue;
+            TwccPacketResult packet; packet.transportSequence = static_cast<std::uint64_t>(p.sent_packet.sequence_number);
+            packet.ssrc = p.rtp_packet_info->ssrc; packet.rtpSequence = p.rtp_packet_info->rtp_sequence_number;
+            packet.wireSize = p.wire_size; packet.sentAt = *p.sent_packet.send_time;
+            packet.remoteArrivalUs = p.remote_arrival_us; packet.ambiguousReceiveTime = p.ambiguous_receive_time;
+            if (p.IsReceived()) { ++event.received; event.receivedBytes += packet.wireSize; }
             else ++event.notReceived;
             event.packets.push_back(std::move(packet));
         }
-        if (event.packets.empty()) return;
-        remoteReference = remoteReference ? std::max(*remoteReference, reference) : reference;
-        ++stats.receivedTwcc;
-        UAV_LOG_DEBUG << "[WebRTC][RTCP][g=" << stats.generation << "] TWCC feedback=" << unsigned(f.feedbackCount)
-            << " received=" << event.received << " not_received=" << event.notReceived;
-        if (callbacks.onTwccFeedback) callbacks.onTwccFeedback(std::move(event));
+        if (!event.packets.empty())
+        {
+            ++stats.receivedTwcc;
+            if (callbacks.onTwccFeedback) callbacks.onTwccFeedback(std::move(event));
+        }
+        if (callbacks.onTransportFeedback) callbacks.onTransportFeedback(std::move(*feedback));
     }
     bool control(const RtcpBytes& b, Time now)
     {
@@ -328,7 +332,7 @@ struct RtcpSession::Impl
             if (const auto* r = std::get_if<RtcpReport>(&message)) report(*r, now);
             else if (const auto* n = std::get_if<RtcpNack>(&message)) nack(*n, now);
             else if (const auto* k = std::get_if<RtcpKeyFrameRequest>(&message)) keyFrame(*k, now);
-            else if (const auto* t = std::get_if<RtcpTwcc>(&message)) twccFeedback(*t);
+            else if (const auto* t = std::get_if<RtcpTwcc>(&message)) twccFeedback(*t, now);
         }
         return true;
     }
@@ -451,7 +455,12 @@ RtcpSession::~RtcpSession() = default;
 bool RtcpSession::configure(RtcpParameters p) { return impl_->configure(std::move(p)); }
 bool RtcpSession::prepareRtp(RtcpBytes& b) { return impl_->prepare(b); }
 bool RtcpSession::reserveRtpExtensions(RtcpBytes& b) { return impl_->prepare(b, false); }
-void RtcpSession::sentRtp(const RtcpBytes& b, RtcpBytes wire, Time now) { impl_->sent(b, std::move(wire), now); }
+std::optional<std::int64_t> RtcpSession::sendingRtp(const RtcpBytes& b, std::size_t size, Time created, Time now, std::size_t overhead)
+{ return impl_->sending(b, size, created, now, overhead); }
+void RtcpSession::retransmittedRtp(std::int64_t seq, Time now) { impl_->transport.MarkRetransmitted(seq, now); }
+void RtcpSession::failedRtp(std::int64_t seq) { impl_->transport.RemovePacket(seq); }
+void RtcpSession::sentRtp(const RtcpBytes& b, RtcpBytes wire, Time now, bool record, std::optional<std::int64_t> sequence)
+{ impl_->sent(b, std::move(wire), now, record, sequence); }
 void RtcpSession::receivedRtp(const RtcpBytes& b, Time now) { impl_->received(b, now); }
 bool RtcpSession::receivedRtcp(const RtcpBytes& b, Time now) { return impl_->control(b, now); }
 bool RtcpSession::requestPli(std::uint32_t ssrc, Time now) { return impl_->pli(ssrc, now); }
@@ -466,18 +475,20 @@ std::vector<RtcpSession::Output> RtcpSession::takeOutput() { auto out = std::mov
 RtcpStats RtcpSession::snapshot() const
 {
     auto stats = impl_->stats; stats.sendStreams = impl_->senders.size(); stats.receiveStreams = impl_->receivers.size();
-    stats.cachedPackets = impl_->cache.size(); stats.twccHistory = impl_->history.size(); return stats;
+    stats.transport = impl_->transport.Snapshot();
+    stats.cachedPackets = impl_->cache.size(); stats.twccHistory = stats.transport.history_size; return stats;
 }
 void RtcpSession::reset(std::uint64_t generation)
 {
     auto& s = *impl_; s.stats = {}; s.stats.generation = generation;
     invalidate();
+    s.transport.Reset(generation);
 }
 void RtcpSession::invalidate()
 {
     auto& s = *impl_; s.stats.cachedBytes = 0;
-    s.senders.clear(); s.receivers.clear(); s.cache.clear(); s.history.clear(); s.arrivals.clear(); s.lateArrivals.clear();
-    s.output.clear(); s.reportAt.reset(); s.twccAt.reset(); s.remoteReference.reset(); s.nextTransport = 0;
+    s.senders.clear(); s.receivers.clear(); s.cache.clear(); s.transport.Clear(); s.transportDeltas.Reset(); s.arrivals.clear(); s.lateArrivals.clear();
+    s.output.clear(); s.reportAt.reset(); s.twccAt.reset(); s.nextTransport = 0;
     s.twccInitialized = false; s.feedbackCount = 0;
 }
 } // namespace webrtc

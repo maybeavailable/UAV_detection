@@ -210,3 +210,56 @@ target_include_directories(interval_budget_test PRIVATE "${UAV_PROJECT_ROOT}/src
 target_compile_options(interval_budget_test PRIVATE -Wall -Wextra -Wpedantic)
 add_test(NAME interval_budget COMMAND interval_budget_test)
 set_tests_properties(interval_budget PROPERTIES TIMEOUT 10)
+
+foreach(adapter_target IN ITEMS rtcp_session_test dtls_transport_test peerconnection_test srtp_ctl_test datachannel_peer_test)
+  target_sources(${adapter_target} PRIVATE "${UAV_PROJECT_ROOT}/src/webrtc/transport_adapter.cpp")
+endforeach()
+add_executable(transport_adapter_test transport_adapter_test.cpp
+  "${UAV_PROJECT_ROOT}/src/webrtc/transport_adapter.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/rtcp_protocol.cpp")
+target_include_directories(transport_adapter_test PRIVATE "${UAV_PROJECT_ROOT}/src")
+target_include_directories(transport_adapter_test SYSTEM PRIVATE "${UAV_PROJECT_ROOT}/third_party/boost/include")
+target_compile_options(transport_adapter_test PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(transport_adapter_test PRIVATE webrtc_test_log)
+add_test(NAME transport_adapter COMMAND transport_adapter_test)
+set_tests_properties(transport_adapter PROPERTIES TIMEOUT 10)
+
+add_executable(bitrate_estimator_test bitrate_estimator_test.cpp
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/bitrate_estimator.cpp")
+add_executable(acknowledged_bitrate_estimator_test acknowledged_bitrate_estimator_test.cpp
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/acknowledged_bitrate_estimator.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/bitrate_estimator.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/transport_adapter.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/rtcp_protocol.cpp")
+foreach(estimator_target IN ITEMS bitrate_estimator_test acknowledged_bitrate_estimator_test)
+  target_include_directories(${estimator_target} PRIVATE "${UAV_PROJECT_ROOT}/src")
+  target_include_directories(${estimator_target} SYSTEM PRIVATE "${UAV_PROJECT_ROOT}/third_party/boost/include")
+  target_compile_options(${estimator_target} PRIVATE -Wall -Wextra -Wpedantic)
+  target_link_libraries(${estimator_target} PRIVATE webrtc_test_log)
+endforeach()
+add_test(NAME bitrate_estimator COMMAND bitrate_estimator_test)
+add_test(NAME acknowledged_bitrate_estimator COMMAND acknowledged_bitrate_estimator_test)
+set_tests_properties(bitrate_estimator acknowledged_bitrate_estimator PROPERTIES TIMEOUT 10)
+
+add_executable(inter_arrival_delta_test inter_arrival_delta_test.cpp
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/inter_arrival_delta.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/transport_adapter.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/rtcp_protocol.cpp")
+target_include_directories(inter_arrival_delta_test PRIVATE "${UAV_PROJECT_ROOT}/src")
+target_include_directories(inter_arrival_delta_test SYSTEM PRIVATE "${UAV_PROJECT_ROOT}/third_party/boost/include")
+target_compile_options(inter_arrival_delta_test PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(inter_arrival_delta_test PRIVATE webrtc_test_log)
+add_test(NAME inter_arrival_delta COMMAND inter_arrival_delta_test)
+set_tests_properties(inter_arrival_delta PROPERTIES TIMEOUT 10)
+
+add_executable(alr_detector_test alr_detector_test.cpp
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/alr_detector.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/interval_budget.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/acknowledged_bitrate_estimator.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/bitrate_estimator.cpp")
+target_include_directories(alr_detector_test PRIVATE "${UAV_PROJECT_ROOT}/src")
+target_include_directories(alr_detector_test SYSTEM PRIVATE "${UAV_PROJECT_ROOT}/third_party/boost/include")
+target_compile_options(alr_detector_test PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(alr_detector_test PRIVATE webrtc_test_log)
+add_test(NAME alr_detector COMMAND alr_detector_test)
+set_tests_properties(alr_detector PROPERTIES TIMEOUT 10)

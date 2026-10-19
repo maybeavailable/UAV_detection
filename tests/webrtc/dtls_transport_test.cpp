@@ -54,12 +54,14 @@ struct Link
     std::vector<RtcpNackEvent> nacksAtA;
     std::vector<RtcpKeyFrameEvent> keyFramesAtA;
     std::vector<TwccFeedbackEvent> twccAtA;
+    std::vector<TransportPacketsFeedback> transportAtA;
     std::vector<RtcpReportEvent> reportsAtA;
     std::vector<std::chrono::steady_clock::time_point> rtpSendTimesAtA;
     std::vector<UdpSocket::SendHandler> heldMedia;
     unsigned connectedA{0}, connectedB{0}, errors{0};
     bool dropFirst{false}, corruptNextApplication{false};
     bool dropNextMedia{false}, holdMedia{false};
+    bool deliverHeldMedia{false}, failNextRtpAtA{false};
     bool failNextPliAtB{false};
     Bytes firstApplication;
     explicit Link(DtlsTransport::Config firstConfig = {}, DtlsTransport::Config secondConfig = {})
@@ -82,6 +84,7 @@ struct Link
         firstCallbacks.onNack = [&](auto event) { nacksAtA.push_back(std::move(event)); };
         firstCallbacks.onKeyFrameRequest = [&](auto event) { keyFramesAtA.push_back(std::move(event)); };
         firstCallbacks.onTwccFeedback = [&](auto event) { twccAtA.push_back(std::move(event)); };
+        firstCallbacks.onTransportFeedback = [&](auto event) { transportAtA.push_back(std::move(event)); };
         firstCallbacks.onReceiverReport = [&](auto event) { reportsAtA.push_back(std::move(event)); };
         secondCallbacks.onData = [&](Bytes bytes) { receivedB.push_back(std::move(bytes)); };
         secondCallbacks.onRtpPacket = [&](auto packet) { CHECK(packet.type == IcePacketType::Rtp); rtpAtB.push_back(std::move(packet.datagram.payload)); };
@@ -95,7 +98,13 @@ struct Link
             if (classifyIcePacket(bytes) == IcePacketType::Rtp) rtpSendTimesAtA.push_back(std::chrono::steady_clock::now());
             if (classifyIcePacket(bytes) == IcePacketType::Rtp || classifyIcePacket(bytes) == IcePacketType::Rtcp)
             {
-                if (holdMedia) { heldMedia.push_back(std::move(done)); return; }
+                if (failNextRtpAtA && classifyIcePacket(bytes) == IcePacketType::Rtp)
+                { failNextRtpAtA = false; done(net::error::network_unreachable, 0); return; }
+                if (holdMedia)
+                {
+                    if (deliverHeldMedia) b->handlePacket(packet(std::move(bytes), first, a->snapshot().generation));
+                    heldMedia.push_back(std::move(done)); return;
+                }
                 if (dropNextMedia) { dropNextMedia = false; done({}, size); return; }
             }
             if (!bytes.empty() && bytes[0] == 23)
@@ -385,7 +394,9 @@ void managedFeedback(DtlsSrtpProfile profile)
             return e.report.cumulativeLost == 0 && e.report.highestSequence == 12;
         });
         const bool missing = std::any_of(link.twccAtA.begin(), link.twccAtA.end(), [](const auto& e) { return e.notReceived == 1; });
-        const bool late = std::any_of(link.twccAtA.begin(), link.twccAtA.end(), [](const auto& e) { return e.received == 1 && e.packets[0].rtpSequence == 11; });
+        const bool late = std::any_of(link.twccAtA.begin(), link.twccAtA.end(), [](const auto& e) {
+            return e.received == 1 && e.packets[0].rtpSequence == 11 && e.packets[0].ambiguousReceiveTime;
+        });
         return rr && missing && late && link.a->snapshot().rtcp->sentSenderReports > 0 && link.b->snapshot().rtcp->sentReceiverReports > 0;
     });
     bool requested = false; link.b->requestPli(42, 0, [&](auto ec) { CHECK(!ec); requested = true; });
@@ -455,6 +466,7 @@ void pacingExpiryAndBounds()
     until(link.io, [&] { return expired == 1 && full == 1; });
     CHECK(link.rtpAtB.empty() && link.a->snapshot().srtp->stats.protectedPackets == 0 && link.a->snapshot().rtcp->twccHistory == 0);
     CHECK(link.a->snapshot().pacer->expiredPackets == 1 && link.a->snapshot().pendingMessages == 0);
+    CHECK(link.a->snapshot().rtcp->transport.registered_packets == 0);
     bool rate = false; link.a->setPacingRate(3000000, [&](auto ec) { CHECK(!ec); rate = true; }); until(link.io, [&] { return rate; });
     unsigned sent = 0; link.a->asyncSendRtp(p, [&](auto ec, auto n) { CHECK(!ec && n == p.size()); ++sent; });
     until(link.io, [&] { return sent == 1 && link.rtpAtB.size() == 1; });
@@ -491,6 +503,28 @@ void pacingPaddingBudgets()
     CHECK(link.a->snapshot().pacer->rateBps == 16000 && link.a->snapshot().pacer->paddingRateBps == 16000);
     link.close(); CHECK(link.errors == 0);
 }
+void transportAdapterSubmission()
+{
+    auto cfg = pacedConfig(); cfg.pacer.rateBps = 3000000;
+    Link link(cfg, cfg); link.start(); link.connected(); link.holdMedia = link.deliverHeldMedia = true;
+    unsigned sent = 0;
+    link.a->asyncSendRtp(pacedRtp(1), [&](auto ec, auto n) { CHECK(!ec && n == 176); ++sent; });
+    until(link.io, [&] { return !link.transportAtA.empty() && !link.twccAtA.empty() && link.heldMedia.size() == 1; });
+    CHECK(sent == 0 && link.a->snapshot().rtcp->sendStreams == 0 && link.a->snapshot().pendingWireDatagrams == 1);
+    CHECK(link.transportAtA[0].packet_feedbacks[0].sent_packet.send_time && link.transportAtA[0].data_in_flight == 0);
+    CHECK(link.a->snapshot().rtcp->twccHistory == 0); // feedback already consumed the registered record
+    link.holdMedia = false; link.heldMedia[0]({}, 200); until(link.io, [&] { return sent == 1; });
+    CHECK(link.a->snapshot().rtcp->sendStreams == 1 && link.a->snapshot().rtcp->twccHistory == 0); // completion did not register it again
+    link.failNextRtpAtA = true; bool failed = false;
+    link.a->asyncSendRtp(pacedRtp(2), [&](auto ec, auto n) { CHECK(ec == net::error::network_unreachable && n == 0); failed = true; });
+    until(link.io, [&] { return failed; });
+    CHECK(link.a->snapshot().rtcp->transport.failed_sends == 1 && link.a->snapshot().rtcp->transport.data_in_flight == 0 && link.a->snapshot().rtcp->twccHistory == 0);
+    link.a->asyncSendRtp(pacedRtp(3), [&](auto ec, auto n) { CHECK(!ec && n == 176); ++sent; });
+    until(link.io, [&] { return sent == 2 && link.transportAtA.size() == 2; });
+    CHECK(link.transportAtA.back().packet_feedbacks.size() == 1 && link.transportAtA.back().packet_feedbacks[0].sent_packet.sequence_number == 2);
+    CHECK(link.twccAtA.back().packetDeltas.size() == 1);
+    link.close(); CHECK(link.errors == 0);
+}
 void pacingRestartAndLateCompletion()
 {
     auto cfg = pacedConfig(); cfg.pacer.rateBps = 8000;
@@ -500,6 +534,7 @@ void pacingRestartAndLateCompletion()
     unsigned reset = 0; link.a->reset(1, [&](auto ec) { CHECK(!ec); ++reset; }); link.b->reset(1, [&](auto ec) { CHECK(!ec); ++reset; });
     until(link.io, [&] { return reset == 2 && cancelled == 3; });
     CHECK(link.a->snapshot().pacer->generation == 1 && link.a->snapshot().pacer->queuedPackets == 0 && link.a->snapshot().rtcp->twccHistory == 0);
+    CHECK(link.a->snapshot().rtcp->transport.generation == 1 && link.a->snapshot().rtcp->transport.data_in_flight == 0);
     link.heldMedia[0]({}, 200); until(link.io, [&] { return link.a->snapshot().pendingWireDatagrams == 0; });
     CHECK(cancelled == 3 && link.a->snapshot().rtcp->sendStreams == 0 && link.a->snapshot().pendingMessages == 0);
     link.holdMedia = false; link.start({}, {}, 1); link.connected();
@@ -634,7 +669,7 @@ int main()
         fingerprintPolicy(); timeoutAndReset(); queuesAndOptionalSrtp(); realIceIntegration();
         for (auto profile : {DtlsSrtpProfile::AeadAes128Gcm, DtlsSrtpProfile::AeadAes256Gcm, DtlsSrtpProfile::Aes128CmSha1_80, DtlsSrtpProfile::Aes128CmSha1_32}) managedMedia(profile);
         managedFeedback(DtlsSrtpProfile::AeadAes128Gcm); managedFeedback(DtlsSrtpProfile::Aes128CmSha1_80);
-        pacingAndTimestamps(); pacingExpiryAndBounds(); pacingPaddingBudgets(); pacingRestartAndLateCompletion();
+        pacingAndTimestamps(); pacingExpiryAndBounds(); pacingPaddingBudgets(); transportAdapterSubmission(); pacingRestartAndLateCompletion();
         mediaConfigurationAndFailure(); mediaQueueLimits();
         std::cout << "PASS: DTLS certificates, fingerprints, handshakes, retransmission, data, SRTP keys and real ICE\n";
         return 0;

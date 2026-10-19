@@ -34,6 +34,10 @@ callbacks.onTwccFeedback = [](webrtc::TwccFeedbackEvent event) {
     // packets: transportSequence、ssrc、rtpSequence、wireSize、sentAt、remoteArrivalUs。
     // 上层可计算吞吐、延迟变化并调整码率。
 };
+callbacks.onTransportFeedback = [](webrtc::TransportPacketsFeedback feedback) {
+    // libwebrtc 风格结果：sent_packet、receive_time、在途字节和接收排序。
+    // 间隔用 TransportFeedbackDeltaCalculator 计算，或读取上述事件的 packetDeltas。
+};
 webrtc::PeerConnection peer(io, config, callbacks);
 ```
 
@@ -44,6 +48,8 @@ Offer/Answer 的共同能力决定是否启用 NACK、PLI、FIR、transport-cc�
 直接使用 `DtlsTransport` 时，通过 `config.rtcp.parameters` 或 `configureRtcp` 声明 PT、时钟频率、收发方向、反馈能力和 TWCC 扩展 ID。`config.rtcp.enabled = false` 可保留原有纯加解密/外部 RTCP 模式。
 
 ## 已实现行为
+
+发送历史与 TWCC 关联由 [transport adapter](transport-adapter.md) 实现，参考固定版本的 libwebrtc 源码。包在提交 Sender 前记录时间；成功回调只更新 SR/缓存，失败移除记录。已有 `onTwccFeedback` 提供跨反馈的发送/接收/延迟变化间隔，`onTransportFeedback` 提供上游风格的逐包原始结果。
 
 - 自动生成 SR/RR + SDES CNAME；SR 统计成功发送的原始媒体包与 payload 字节，投影 RTP 时间戳，RR 包含扩展最高序号、区间/累计丢包、jitter 和 LSR/DLSR。多个 SSRC 的报告按 RTCP 明文 MTU 分包。最近两次报告周期内有 RTP 发送时使用 SR，否则使用 RR。SR 与 RR 的周期默认 1 秒，可调整。
 - 收到认证后的 RTP 序号缺口，等待默认 20 ms 的重排窗口再发 NACK；默认每 100 ms 重试，最多 5 次、2 秒过期。迟到包取消对应请求。只追踪有界缺口，过大的序号跳变须连续两个新序号确认后才重建接收统计。

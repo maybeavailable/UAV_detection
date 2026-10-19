@@ -245,6 +245,7 @@ void integration(bool managed = false)
     unsigned dataMessages = 0;
     std::vector<RtcpKeyFrameEvent> keyFrameEvents;
     std::vector<TwccFeedbackEvent> twccEvents;
+    std::vector<TransportPacketsFeedback> transportEvents;
     std::vector<RtcpReportEvent> reportEvents;
     PeerConnection::Config c; c.media = {PeerMedia::video("video", {{96, "VP8", 90000, 1, {}}})};
     c.dtls.enableSrtp = managed; c.enableDataChannels = managed;
@@ -302,6 +303,7 @@ void integration(bool managed = false)
         };
         ha.onKeyFrameRequest = [&](auto event) { keyFrameEvents.push_back(std::move(event)); };
         ha.onTwccFeedback = [&](auto event) { twccEvents.push_back(std::move(event)); };
+        ha.onTransportFeedback = [&](auto event) { transportEvents.push_back(std::move(event)); };
         ha.onReceiverReport = [&](auto event) { reportEvents.push_back(std::move(event)); };
         hb.onDataChannel = [&](auto channel) {
             remoteChannel = channel; DataChannel::Callbacks handlers;
@@ -372,7 +374,9 @@ void integration(bool managed = false)
         CHECK(std::find(plaintext.begin(), plaintext.end(), originalQ) != plaintext.end());
         if (managed)
         {
-            until(io, [&] { return dataMessages == round + 1 && twccEvents.size() == round + 1 && reportEvents.size() >= round + 1; });
+            until(io, [&] { return dataMessages == round + 1 && twccEvents.size() == round + 1 && transportEvents.size() == round + 1 && reportEvents.size() >= round + 1; });
+            CHECK(transportEvents.back().generation == round && transportEvents.back().ReceivedWithSendInfo().size() == 1);
+            CHECK(transportEvents.back().packet_feedbacks[0].sent_packet.send_time == twccEvents.back().packets[0].sentAt);
             CHECK(twccEvents.back().generation == round && twccEvents.back().received == 1 && twccEvents.back().packets[0].rtpSequence == 7);
             CHECK(a->snapshot().negotiatedMedia[0].feedback.size() == 4 && a->snapshot().negotiatedMedia[0].extmaps[0].id == 5);
             perform(io, [&](auto done) { b->requestPli(0x01020304, done); });

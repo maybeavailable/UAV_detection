@@ -1,0 +1,30 @@
+Portions of src/webrtc/transport_adapter.h/.cpp and
+src/webrtc/congestion_control/bitrate_estimator.h/.cpp and
+src/webrtc/congestion_control/acknowledged_bitrate_estimator.h/.cpp and
+src/webrtc/congestion_control/inter_arrival_delta.h/.cpp and
+src/webrtc/congestion_control/alr_detector.h/.cpp
+are adapted from The WebRTC project.
+
+Upstream revision: 602d5fc23caaca7728ad5f3f0e68b92274d1a38a
+
+Original files:
+  modules/congestion_controller/rtp/transport_feedback_adapter.h
+  modules/congestion_controller/rtp/transport_feedback_adapter.cc
+  api/transport/network_types.h
+  api/transport/network_types.cc
+  modules/congestion_controller/goog_cc/bitrate_estimator.h
+  modules/congestion_controller/goog_cc/bitrate_estimator.cc
+  modules/congestion_controller/goog_cc/acknowledged_bitrate_estimator.h
+  modules/congestion_controller/goog_cc/acknowledged_bitrate_estimator.cc
+  modules/congestion_controller/goog_cc/inter_arrival_delta.h
+  modules/congestion_controller/goog_cc/inter_arrival_delta.cc
+  modules/congestion_controller/goog_cc/alr_detector.h
+  modules/congestion_controller/goog_cc/alr_detector.cc
+  modules/pacing/interval_budget.h
+  modules/pacing/interval_budget.cc
+
+Source: https://webrtc.googlesource.com/src/+/602d5fc23caaca7728ad5f3f0e68b92274d1a38a/
+
+The upstream BSD license and patent grant are preserved in LICENSE and PATENTS.
+See docs/transport-adapter.md, docs/bitrate-estimator.md and
+docs/inter-arrival-delta.md and docs/alr-detector.md for adaptations.

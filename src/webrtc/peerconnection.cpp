@@ -612,6 +612,7 @@ struct PeerConnection::Impl : std::enable_shared_from_this<PeerConnection::Impl>
         dh.onNack = bridgeFeedback(&Callbacks::onNack);
         dh.onKeyFrameRequest = bridgeFeedback(&Callbacks::onKeyFrameRequest);
         dh.onTwccFeedback = bridgeFeedback(&Callbacks::onTwccFeedback);
+        dh.onTransportFeedback = bridgeFeedback(&Callbacks::onTransportFeedback);
         auto nextDtls = std::make_unique<DtlsTransport>(io, [weak](Bytes bytes, SendHandler done) {
             if (auto self = weak.lock()) self->ice->asyncSend(std::move(bytes), 1, std::move(done));
             else if (done) done(net::error::operation_aborted, 0);

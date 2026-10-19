@@ -101,6 +101,7 @@ public:
         std::function<void(RtcpKeyFrameEvent)> onKeyFrameRequest;
         std::function<void(TwccFeedbackEvent)> onTwccFeedback;
         std::function<void(ErrorCode, std::string)> onError;
+        std::function<void(TransportPacketsFeedback)> onTransportFeedback;
     };
 
     DtlsTransport(boost::asio::io_context& io, Sender sender);

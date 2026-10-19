@@ -308,8 +308,13 @@ set(UAV_SOURCES
   src/webrtc/srtcp_ctl.cpp      # RTCP/SRTCP 加解密控制
   src/webrtc/rtcp_protocol.cpp # SR/RR、NACK/PLI/FIR、TWCC 编解码
   src/webrtc/rtcp_session.cpp  # 自动 RTCP 报告、反馈与 SRTP 密文重传
+  src/webrtc/transport_adapter.cpp # libwebrtc 风格发送历史、在途字节及 TWCC 适配
   src/webrtc/congestion_control/pacer.cpp # RTP 优先级队列、按速率放行和有界等待
   src/webrtc/congestion_control/interval_budget.cpp # 媒体/padding 的周期字节预算
+  src/webrtc/congestion_control/bitrate_estimator.cpp # 窗口采样与贝叶斯吞吐滤波
+  src/webrtc/congestion_control/acknowledged_bitrate_estimator.cpp # TWCC 确认吞吐及 ALR 状态
+  src/webrtc/congestion_control/inter_arrival_delta.cpp # 发送包分组及组间发送/接收/大小差值
+  src/webrtc/congestion_control/alr_detector.cpp # 实际发送预算与应用受限区域检测
   src/rtsp/rtspserver.cpp
   src/rtsp/rtp_source.cpp
   src/rtsp/rtp_transport.cpp

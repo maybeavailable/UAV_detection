@@ -70,7 +70,7 @@ void sessions()
 {
     const auto start = RtcpSession::Time(10s); auto c = config();
     std::vector<TwccFeedbackEvent> twcc; std::vector<RtcpReportEvent> rr; std::vector<RtcpKeyFrameEvent> keyframes; std::vector<RtcpNackEvent> nacks;
-    RtcpSession sender(c, {[&](auto e) { rr.push_back(e); }, [&](auto e) { nacks.push_back(e); }, [&](auto e) { keyframes.push_back(e); }, [&](auto e) { twcc.push_back(e); }});
+    RtcpSession sender(c, {[&](auto e) { rr.push_back(e); }, [&](auto e) { nacks.push_back(e); }, [&](auto e) { keyframes.push_back(e); }, [&](auto e) { twcc.push_back(e); }, {}});
     RtcpSession receiver(c);
     std::vector<RtcpBytes> packets;
     for (unsigned i = 0; i < 3; ++i)
@@ -131,7 +131,7 @@ void sessions()
 void rolloverAndLimits()
 {
     auto c = config(); c.parameters.reducedSize = true; const auto t = RtcpSession::Time(30s);
-    std::vector<TwccFeedbackEvent> events; RtcpSession sender(c, {{}, {}, {}, [&](auto e) { events.push_back(e); }});
+    std::vector<TwccFeedbackEvent> events; RtcpSession sender(c, {{}, {}, {}, [&](auto e) { events.push_back(e); }, {}});
     for (unsigned i = 0; i < 65538; ++i)
     {
         auto b = rtp(i); CHECK(sender.prepareRtp(b)); sender.sentRtp(b, {1, 2, 3}, t + i * 1us);
@@ -155,6 +155,30 @@ void rolloverAndLimits()
     { CHECK(r->reports[0].cumulativeLost == 1 && r->reports[0].fractionLost == 85); report = true; }
     CHECK(report);
 }
+void submissionBeforeCompletion()
+{
+    auto c = config(); const auto t = RtcpSession::Time(30s);
+    std::vector<TwccFeedbackEvent> events; std::vector<TransportPacketsFeedback> raw;
+    RtcpSession sender(c, {{}, {}, {}, [&](auto e) { events.push_back(std::move(e)); }, [&](auto e) { raw.push_back(std::move(e)); }});
+    auto p = rtp(1); CHECK(sender.prepareRtp(p));
+    CHECK(sender.sendingRtp(p, 1000, t, t + 10ms, 28) == 0);
+    CHECK(sender.snapshot().transport.data_in_flight == 1028 && sender.snapshot().sendStreams == 0);
+    RtcpTwcc f; f.referenceTime = 3; f.deltas = {1};
+    CHECK(sender.receivedRtcp(buildRtcpTwcc(f), t + 20ms));
+    CHECK(raw.size() == 1 && events.size() == 1 && raw[0].packet_feedbacks[0].sent_packet.send_time == t + 10ms);
+    CHECK(raw[0].packet_feedbacks[0].sent_packet.size == 1028 && raw[0].data_in_flight == 0);
+    sender.sentRtp(p, {1, 2, 3}, t + 10ms, false); // delayed success only updates report/cache
+    CHECK(sender.snapshot().twccHistory == 0 && sender.snapshot().sendStreams == 1);
+    CHECK(sender.receivedRtcp(buildRtcpTwcc(f), t + 21ms) && raw.size() == 1);
+    auto next = rtp(2); CHECK(sender.prepareRtp(next)); CHECK(sender.sendingRtp(next, 1000, t + 30ms, t + 30ms) == 1);
+    f.baseSequence = 1; f.deltas = {41}; CHECK(sender.receivedRtcp(buildRtcpTwcc(f), t + 40ms));
+    CHECK(events.size() == 2 && events.back().packetDeltas.size() == 1);
+    CHECK(events.back().packetDeltas[0].send_delta == 20ms && events.back().packetDeltas[0].receive_delta == 10ms);
+    CHECK(events.back().packetDeltas[0].delay_delta == -10ms);
+    auto failed = rtp(3); CHECK(sender.prepareRtp(failed)); CHECK(sender.sendingRtp(failed, 1000, t + 50ms, t + 50ms) == 2);
+    sender.failedRtp(2); CHECK(sender.snapshot().transport.data_in_flight == 0 && sender.snapshot().transport.failed_sends == 1);
+    sender.reset(7); CHECK(sender.snapshot().transport.generation == 7 && sender.snapshot().transport.sent_packets == 0);
+}
 void schedulingAndNegotiation()
 {
     auto c = config(); c.parameters.media[0].transportCc = false; const auto t = RtcpSession::Time(50s);
@@ -166,7 +190,7 @@ void schedulingAndNegotiation()
     receiver.receivedRtp(rtp(5), t + 46ms); receiver.poll(t + 60ms, 1); CHECK(receiver.takeOutput().size() == 1);
     receiver.poll(t + 3s, 1); CHECK(receiver.snapshot().sentNacks == 2); // expired gap does not keep retrying
     c.parameters.media[0].nack = c.parameters.media[0].pli = c.parameters.media[0].fir = false;
-    unsigned events = 0; RtcpSession disabled(c, {{}, [&](auto) { ++events; }, [&](auto) { ++events; }, [&](auto) { ++events; }});
+    unsigned events = 0; RtcpSession disabled(c, {{}, [&](auto) { ++events; }, [&](auto) { ++events; }, [&](auto) { ++events; }, {}});
     auto p = rtp(1); CHECK(disabled.prepareRtp(p)); CHECK(!rtpTransportSequence(p, 5)); disabled.sentRtp(p, {1}, t);
     CHECK(disabled.receivedRtcp(buildRtcpNack({10, 42, {1}}), t + 20ms));
     CHECK(disabled.receivedRtcp(buildRtcpKeyFrameRequest({10, 42, RtcpKeyFrameRequest::Kind::Pli, 0}), t + 20ms));
@@ -187,6 +211,6 @@ void schedulingAndNegotiation()
 }
 int main()
 {
-    try { codecs(); extensions(); sessions(); rolloverAndLimits(); schedulingAndNegotiation(); std::cout << "PASS: RTCP reports, feedback codecs, recovery, TWCC and lifecycle\n"; return 0; }
+    try { codecs(); extensions(); sessions(); rolloverAndLimits(); submissionBeforeCompletion(); schedulingAndNegotiation(); std::cout << "PASS: RTCP reports, feedback codecs, recovery, TWCC and lifecycle\n"; return 0; }
     catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }
 }
