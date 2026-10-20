@@ -315,6 +315,11 @@ set(UAV_SOURCES
   src/webrtc/congestion_control/acknowledged_bitrate_estimator.cpp # TWCC 确认吞吐及 ALR 状态
   src/webrtc/congestion_control/inter_arrival_delta.cpp # 发送包分组及组间发送/接收/大小差值
   src/webrtc/congestion_control/alr_detector.cpp # 实际发送预算与应用受限区域检测
+  src/webrtc/congestion_control/trendline_estimator.cpp # 延迟趋势拟合、自适应阈值及过载判定
+  src/webrtc/congestion_control/link_capacity_estimator.cpp # 链路容量均值、方差及容量上下界
+  src/webrtc/congestion_control/aimd_rate_control.cpp # 延迟带宽估计的 AIMD 调速
+  src/webrtc/congestion_control/delay_based_bwe.cpp # TWCC 延迟检测与发送端目标码率
+  src/webrtc/congestion_control/loss_based_bwe_v2.cpp # 固有/拥塞丢包建模、候选带宽与恢复状态
   src/rtsp/rtspserver.cpp
   src/rtsp/rtp_source.cpp
   src/rtsp/rtp_transport.cpp

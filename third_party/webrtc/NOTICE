@@ -2,8 +2,15 @@ Portions of src/webrtc/transport_adapter.h/.cpp and
 src/webrtc/congestion_control/bitrate_estimator.h/.cpp and
 src/webrtc/congestion_control/acknowledged_bitrate_estimator.h/.cpp and
 src/webrtc/congestion_control/inter_arrival_delta.h/.cpp and
-src/webrtc/congestion_control/alr_detector.h/.cpp
+src/webrtc/congestion_control/alr_detector.h/.cpp and
+src/webrtc/congestion_control/trendline_estimator.h/.cpp and its detector interfaces and
+src/webrtc/congestion_control/link_capacity_estimator.h/.cpp and
+src/webrtc/congestion_control/aimd_rate_control.h/.cpp and
+src/webrtc/congestion_control/delay_based_bwe.h/.cpp and network_state_estimate.h and
+src/webrtc/congestion_control/loss_based_bwe_v2.h/.cpp
 are adapted from The WebRTC project.
+Regression scenarios in tests/webrtc/loss_based_bwe_v2_test.cpp are also adapted
+from the upstream loss_based_bwe_v2_test.cc.
 
 Upstream revision: 602d5fc23caaca7728ad5f3f0e68b92274d1a38a
 
@@ -22,9 +29,31 @@ Original files:
   modules/congestion_controller/goog_cc/alr_detector.cc
   modules/pacing/interval_budget.h
   modules/pacing/interval_budget.cc
+  modules/congestion_controller/goog_cc/trendline_estimator.h
+  modules/congestion_controller/goog_cc/trendline_estimator.cc
+  modules/congestion_controller/goog_cc/delay_increase_detector_interface.h
+  api/network_state_predictor.h
+  api/transport/bandwidth_usage.h
+  modules/congestion_controller/goog_cc/link_capacity_estimator.h
+  modules/congestion_controller/goog_cc/link_capacity_estimator.cc
+  modules/remote_bitrate_estimator/aimd_rate_control.h
+  modules/remote_bitrate_estimator/aimd_rate_control.cc
+  modules/remote_bitrate_estimator/include/bwe_defines.h
+  modules/congestion_controller/goog_cc/delay_based_bwe.h
+  modules/congestion_controller/goog_cc/delay_based_bwe.cc
+  modules/congestion_controller/goog_cc/loss_based_bwe_v2.h
+  modules/congestion_controller/goog_cc/loss_based_bwe_v2.cc
+  modules/congestion_controller/goog_cc/loss_based_bwe_v2_test.cc
+  api/units/data_rate.h
+  api/units/data_size.h
+  api/units/time_delta.h
+  api/units/timestamp.h
+  rtc_base/units/unit_base.h
 
 Source: https://webrtc.googlesource.com/src/+/602d5fc23caaca7728ad5f3f0e68b92274d1a38a/
 
 The upstream BSD license and patent grant are preserved in LICENSE and PATENTS.
-See docs/transport-adapter.md, docs/bitrate-estimator.md and
-docs/inter-arrival-delta.md and docs/alr-detector.md for adaptations.
+See docs/transport-adapter.md, docs/bitrate-estimator.md,
+docs/inter-arrival-delta.md, docs/alr-detector.md and
+docs/trendline-estimator.md, docs/link-capacity-estimator.md and
+docs/delay-based-bwe.md and docs/loss-based-bwe-v2.md for adaptations.

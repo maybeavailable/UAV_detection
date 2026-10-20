@@ -54,6 +54,10 @@ void onFeedback(const webrtc::TransportPacketsFeedback& feedback)
 
 [AlrDetector](alr-detector.md) 根据发送字节和带宽估计提供 ALR 状态，文档中给出与本类配合的发送/反馈调用时机。
 
+[LinkCapacityEstimator](link-capacity-estimator.md) 在控制器检测到过载时消费确认吞吐，结合探测结果维护容量均值和上下界。
+
+[DelayBasedBwe](delay-based-bwe.md) 已组合包组差值、Trendline 和 AIMD，可将本类的 `bitrate()` 作为确认吞吐输入，得到延迟带宽目标。
+
 类本身同步执行，不自行加锁、不注册 transport 回调。ICE generation/路由更换时，拥有者应重建估计器，防止不同路径的时间和吞吐样本混合。这是后续发送端带宽控制器的输入，尚未据此自动修改 pacer 或编码器码率。
 
 ## 验证

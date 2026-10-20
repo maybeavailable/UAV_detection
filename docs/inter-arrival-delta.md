@@ -53,6 +53,8 @@ void onFeedback(const webrtc::TransportPacketsFeedback& feedback)
 
 本类不保存 `PacketResult`、序号或 generation，不自动筛选重传歧义、不自动订阅 transport，也不实现流超时策略。拥有者在 ICE generation、路由或流生命周期变化时重建它，必要时按自身策略过滤歧义反馈。已有 `TransportFeedbackDeltaCalculator` 仍提供逐包间隔，两者用途不同；后续延迟带宽估计使用这里的包组间隔。
 
+[TrendlineEstimator](trendline-estimator.md) 已实现包组差值的平滑、线性拟合、自适应阈值和正常/过载/欠载检测，文档给出组合调用示例。
+
 ## 验证
 
 `inter_arrival_delta_test` 覆盖分组边界、带符号大小差、零字节组、5 ms 突发间隔、严格 100 ms 突发上限、相同发送时间、组内乱序、旧包丢弃、连续乱序重置及恢复、零接收差、3 秒时钟偏移阈值、本地时钟回退、微秒精度、输入与数值边界，以及跨两批 TWCC 的实际 adapter 数据路径。
