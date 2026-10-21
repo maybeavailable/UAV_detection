@@ -77,6 +77,8 @@ webrtc::DelayBasedBwe::Result onFeedback(
 
 ALR 结束时仍应按确认吞吐组件的约定调用 `SetAlrEndedTime`。`probe_bps` 是外部探测估计结果，本类不根据 probe cluster 自行计算它。包大小使用 `sent_packet.size`，不把 `prior_unacked_data` 加入延迟包组；后者仅属于确认吞吐计量。
 
+[ProbeBitrateEstimator](probe-bitrate-estimator.md) 已实现探测簇发送/接收速率计算，处理完一批收到的探测包后，可用 `FetchAndResetLastEstimatedBitrate()` 获取本批探测估计并传入 `probe_bps`。
+
 这是 GCC 的延迟带宽估计组件。当前提供完整反馈输入和目标码率输出，不自动接管 `DtlsTransport` 的 pacer 或编码器；后续发送控制器可以在整合探测、其他限制与估计后统一消费目标值。
 
 [LossBasedBweV2](loss-based-bwe-v2.md) 已实现丢包模型，可以消费本类的有效估计与完整的 `packet_feedbacks`，结合确认吞吐生成丢包受限带宽及恢复状态；不要将仅包含收到包的排序向量用于丢包统计。

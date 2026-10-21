@@ -13,6 +13,19 @@ target_include_directories(webrtc_test_log PUBLIC "${UAV_PROJECT_ROOT}/src")
 target_include_directories(webrtc_test_log SYSTEM PRIVATE "${UAV_PROJECT_ROOT}/third_party/boost/include")
 target_compile_options(webrtc_test_log PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(webrtc_test_log PUBLIC Threads::Threads)
+set(UAV_GCC_TEST_SOURCES
+  network_control goog_cc_network_control send_side_bandwidth_estimation congestion_window_pushback_controller
+  acknowledged_bitrate_estimator bitrate_estimator alr_detector interval_budget probe_controller probe_bitrate_estimator
+  delay_based_bwe aimd_rate_control link_capacity_estimator trendline_estimator inter_arrival_delta loss_based_bwe_v2
+  bitrate_prober gcc_transport_controller)
+add_library(webrtc_test_gcc STATIC)
+foreach(gcc_source IN LISTS UAV_GCC_TEST_SOURCES)
+  target_sources(webrtc_test_gcc PRIVATE "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/${gcc_source}.cpp")
+endforeach()
+target_include_directories(webrtc_test_gcc PUBLIC "${UAV_PROJECT_ROOT}/src")
+target_include_directories(webrtc_test_gcc SYSTEM PUBLIC "${UAV_PROJECT_ROOT}/third_party/boost/include")
+target_compile_options(webrtc_test_gcc PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(webrtc_test_gcc PUBLIC webrtc_test_log)
 list(APPEND CMAKE_MODULE_PATH "${UAV_PROJECT_ROOT}/cmake")
 find_package(USRSCTP REQUIRED)
 add_executable(ice_candidate_test ice_candidate_test.cpp
@@ -182,6 +195,9 @@ foreach(webrtc_logged_target IN ITEMS ice_agent_test ice_transport_test dtls_tra
     peerconnection_test srtp_ctl_test datachannel_test datachannel_peer_test)
   target_link_libraries(${webrtc_logged_target} PRIVATE webrtc_test_log)
 endforeach()
+foreach(gcc_transport_target IN ITEMS dtls_transport_test peerconnection_test srtp_ctl_test datachannel_peer_test)
+  target_link_libraries(${gcc_transport_target} PRIVATE webrtc_test_gcc)
+endforeach()
 
 add_executable(rtcp_session_test rtcp_session_test.cpp
   "${UAV_PROJECT_ROOT}/src/webrtc/rtcp_protocol.cpp"
@@ -208,6 +224,10 @@ add_executable(interval_budget_test interval_budget_test.cpp
   "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/interval_budget.cpp")
 target_include_directories(interval_budget_test PRIVATE "${UAV_PROJECT_ROOT}/src")
 target_compile_options(interval_budget_test PRIVATE -Wall -Wextra -Wpedantic)
+foreach(budget_logged_target IN ITEMS pacer_test interval_budget_test)
+  target_include_directories(${budget_logged_target} SYSTEM PRIVATE "${UAV_PROJECT_ROOT}/third_party/boost/include")
+  target_link_libraries(${budget_logged_target} PRIVATE webrtc_test_log)
+endforeach()
 add_test(NAME interval_budget COMMAND interval_budget_test)
 set_tests_properties(interval_budget PROPERTIES TIMEOUT 10)
 
@@ -327,3 +347,80 @@ target_compile_options(loss_based_bwe_v2_test PRIVATE -Wall -Wextra -Wpedantic)
 target_link_libraries(loss_based_bwe_v2_test PRIVATE webrtc_test_log)
 add_test(NAME loss_based_bwe_v2 COMMAND loss_based_bwe_v2_test)
 set_tests_properties(loss_based_bwe_v2 PROPERTIES TIMEOUT 10)
+
+add_executable(probe_controller_test probe_controller_test.cpp
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/probe_controller.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/alr_detector.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/interval_budget.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/transport_adapter.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/rtcp_protocol.cpp")
+target_include_directories(probe_controller_test PRIVATE "${UAV_PROJECT_ROOT}/src")
+target_include_directories(probe_controller_test SYSTEM PRIVATE "${UAV_PROJECT_ROOT}/third_party/boost/include")
+target_compile_options(probe_controller_test PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(probe_controller_test PRIVATE webrtc_test_log)
+add_test(NAME probe_controller COMMAND probe_controller_test)
+set_tests_properties(probe_controller PROPERTIES TIMEOUT 10)
+
+add_executable(probe_bitrate_estimator_test probe_bitrate_estimator_test.cpp
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/probe_bitrate_estimator.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/probe_controller.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/delay_based_bwe.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/aimd_rate_control.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/link_capacity_estimator.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/trendline_estimator.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/inter_arrival_delta.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/transport_adapter.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/rtcp_protocol.cpp")
+target_include_directories(probe_bitrate_estimator_test PRIVATE "${UAV_PROJECT_ROOT}/src")
+target_include_directories(probe_bitrate_estimator_test SYSTEM PRIVATE "${UAV_PROJECT_ROOT}/third_party/boost/include")
+target_compile_options(probe_bitrate_estimator_test PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(probe_bitrate_estimator_test PRIVATE webrtc_test_log)
+add_test(NAME probe_bitrate_estimator COMMAND probe_bitrate_estimator_test)
+set_tests_properties(probe_bitrate_estimator PROPERTIES TIMEOUT 10)
+
+add_executable(goog_cc_network_control_test goog_cc_network_control_test.cpp
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/network_control.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/goog_cc_network_control.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/send_side_bandwidth_estimation.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/congestion_window_pushback_controller.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/acknowledged_bitrate_estimator.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/bitrate_estimator.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/alr_detector.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/interval_budget.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/probe_controller.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/probe_bitrate_estimator.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/delay_based_bwe.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/aimd_rate_control.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/link_capacity_estimator.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/trendline_estimator.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/inter_arrival_delta.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/loss_based_bwe_v2.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/pacer.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/transport_adapter.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/rtcp_protocol.cpp")
+target_include_directories(goog_cc_network_control_test PRIVATE "${UAV_PROJECT_ROOT}/src")
+target_include_directories(goog_cc_network_control_test SYSTEM PRIVATE "${UAV_PROJECT_ROOT}/third_party/boost/include")
+target_compile_options(goog_cc_network_control_test PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(goog_cc_network_control_test PRIVATE webrtc_test_log)
+add_test(NAME goog_cc_network_control COMMAND goog_cc_network_control_test)
+set_tests_properties(goog_cc_network_control PROPERTIES TIMEOUT 20)
+
+add_executable(gcc_transport_controller_test gcc_transport_controller_test.cpp
+  "${UAV_PROJECT_ROOT}/src/webrtc/rtcp_session.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/rtcp_protocol.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/transport_adapter.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/pacer.cpp")
+target_link_libraries(gcc_transport_controller_test PRIVATE webrtc_test_gcc)
+target_compile_options(gcc_transport_controller_test PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME gcc_transport_controller COMMAND gcc_transport_controller_test)
+set_tests_properties(gcc_transport_controller PROPERTIES TIMEOUT 10)
+
+add_executable(gcc_network_simulation_test gcc_network_simulation_test.cpp
+  "${UAV_PROJECT_ROOT}/src/webrtc/rtcp_session.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/rtcp_protocol.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/transport_adapter.cpp"
+  "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/pacer.cpp")
+target_link_libraries(gcc_network_simulation_test PRIVATE webrtc_test_gcc)
+target_compile_options(gcc_network_simulation_test PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME gcc_network_simulation COMMAND gcc_network_simulation_test)
+set_tests_properties(gcc_network_simulation PROPERTIES TIMEOUT 30)

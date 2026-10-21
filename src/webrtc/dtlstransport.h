@@ -4,6 +4,7 @@
 #include"webrtc/srtcp_ctl.h"
 #include"webrtc/rtcp_session.h"
 #include"webrtc/congestion_control/pacer.h"
+#include"webrtc/congestion_control/gcc_transport_controller.h"
 
 #include<chrono>
 #include<cstddef>
@@ -71,6 +72,7 @@ public:
         SrtcpCtl::Config srtcp;
         RtcpSession::Config rtcp; // enableSrtp 时本层管理报告、反馈及重传；PT/反馈由 SDP 配置
         Pacer::Config pacer; // 内置媒体模式默认节奏发送 RTP/重传；DTLS/SCTP/RTCP 直接发送
+        GccTransportConfig congestionControl; // 自动 GCC；手动控制 pacing 时可关闭 enabled
     };
     struct Snapshot
     {
@@ -85,6 +87,7 @@ public:
         std::optional<SrtcpCtl::Snapshot> srtcp;
         std::optional<RtcpStats> rtcp;
         std::optional<Pacer::Snapshot> pacer;
+        std::optional<GccTransportSnapshot> congestionControl;
         std::string cipher, protocol;
         std::size_t maxPlaintextSize{0}, pendingMessages{0}, pendingWireDatagrams{0};
         DtlsStats stats;
@@ -102,6 +105,8 @@ public:
         std::function<void(TwccFeedbackEvent)> onTwccFeedback;
         std::function<void(ErrorCode, std::string)> onError;
         std::function<void(TransportPacketsFeedback)> onTransportFeedback;
+        std::function<void(CongestionControlEvent)> onTargetTransferRate;
+        std::function<void(RtcpRembEvent)> onRemoteBitrateReport;
     };
 
     DtlsTransport(boost::asio::io_context& io, Sender sender);
@@ -127,9 +132,12 @@ public:
     void asyncSendRtcp(Bytes plaintext, std::uint64_t generation, SendHandler done = {});
     void configureRtcp(RtcpParameters parameters, Completion done = {});
     void requestPli(std::uint32_t mediaSsrc, std::uint64_t generation, Completion done = {}); // 完成回调包含实际发送错误
-    void setPacingRate(std::uint64_t rateBps, Completion done = {}); // 发送端 BWE 设置 pacing rate，0 暂停 RTP
+    void setPacingRate(std::uint64_t rateBps, Completion done = {}); // GCC 活动时由估计器管理；手动模式 0 暂停 RTP
     void setPacingRates(std::uint64_t rateBps, std::uint64_t paddingRateBps, Completion done = {});
     void setPacingPaused(bool paused, Completion done = {}); // 保留有界队列，排队超时仍生效
+    void setBitrateConstraints(TargetRateConstraints constraints, Completion done = {});
+    void setStreamsConfig(StreamsConfig streams, Completion done = {});
+    void setNetworkStateEstimate(NetworkStateEstimate estimate, Completion done = {});
     // 可用于其他协议的 RFC 5705 exporter；nullopt 与空 context 在 TLS 1.2 中有不同语义。
     void exportKeyingMaterial(std::string label, std::size_t size, std::optional<Bytes> context,
                               std::function<void(ErrorCode, Bytes)> done);

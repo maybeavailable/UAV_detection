@@ -51,6 +51,7 @@ struct TwccPacketResult
     std::optional<std::int64_t> remoteArrivalUs;
     bool ambiguousReceiveTime{false};
 };
+struct RtcpRembEvent { std::uint64_t generation{0}; RtcpRemb feedback; };
 struct TwccFeedbackEvent
 {
     std::uint64_t generation{0};
@@ -98,9 +99,12 @@ public:
         std::function<void(RtcpKeyFrameEvent)> onKeyFrameRequest;
         std::function<void(TwccFeedbackEvent)> onTwccFeedback;
         std::function<void(TransportPacketsFeedback)> onTransportFeedback;
+        std::function<void(SentPacket)> onSentPacket{};
+        std::function<void(RtcpRembEvent)> onRemb{};
     };
     struct Output { RtcpBytes bytes; bool retransmission{false}; std::optional<std::int64_t> transportSequence; }; // retransmission is already SRTP ciphertext
-    explicit RtcpSession(Config config, Callbacks callbacks = {});
+    explicit RtcpSession(Config config);
+    RtcpSession(Config config, Callbacks callbacks);
     ~RtcpSession();
     RtcpSession(const RtcpSession&) = delete;
     RtcpSession& operator=(const RtcpSession&) = delete;
@@ -108,8 +112,10 @@ public:
     bool prepareRtp(RtcpBytes& plaintext); // adds negotiated association-wide TWCC sequence
     bool reserveRtpExtensions(RtcpBytes& plaintext); // reserves space before queuing; doesn't consume a TWCC sequence
     // Register submission before the Sender can synchronously return feedback.
-    std::optional<std::int64_t> sendingRtp(const RtcpBytes& plaintext, std::size_t wireSize, Time createdAt, Time sentAt, std::size_t overheadBytes = 0);
-    void retransmittedRtp(std::int64_t transportSequence, Time sentAt);
+    std::optional<std::int64_t> sendingRtp(const RtcpBytes& plaintext, std::size_t wireSize, Time createdAt, Time sentAt,
+        std::size_t overheadBytes = 0, const PacedPacketInfo& pacing = {});
+    void retransmittedRtp(std::int64_t transportSequence, Time sentAt, std::size_t wireSize = 0, std::size_t overheadBytes = 0);
+    std::size_t outstandingData() const;
     void failedRtp(std::int64_t transportSequence);
     // Success-only SR statistics/cache. Direct users can also register the send here;
     // Transport callers pass recordTransport=false and the full id returned by sendingRtp().

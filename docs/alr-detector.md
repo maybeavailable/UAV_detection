@@ -1,5 +1,7 @@
 # AlrDetector
 
+[ProbeController](probe-controller.md) 可直接消费本类的 ALR 起点，驱动周期探测和恢复探测。退出 ALR 时应清除控制器起点并设置结束时间。
+
 `src/webrtc/congestion_control/alr_detector.h/.cpp` 参考与本项目其他拥塞控制组件相同的 libwebrtc 修订版 `602d5fc23caaca7728ad5f3f0e68b92274d1a38a`，根据实际发送字节和发送间隔识别应用受限区域（ALR）。
 
 源码依据：[alr_detector.h](https://webrtc.googlesource.com/src/+/602d5fc23caaca7728ad5f3f0e68b92274d1a38a/modules/congestion_controller/goog_cc/alr_detector.h)、[alr_detector.cc](https://webrtc.googlesource.com/src/+/602d5fc23caaca7728ad5f3f0e68b92274d1a38a/modules/congestion_controller/goog_cc/alr_detector.cc)、[IntervalBudget](https://webrtc.googlesource.com/src/+/602d5fc23caaca7728ad5f3f0e68b92274d1a38a/modules/pacing/interval_budget.cc)。BSD 许可、专利声明和来源见 `third_party/webrtc/LICENSE`、`PATENTS`、`NOTICE`。

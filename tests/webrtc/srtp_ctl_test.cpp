@@ -249,6 +249,7 @@ void integration(bool managed = false)
     std::vector<RtcpReportEvent> reportEvents;
     PeerConnection::Config c; c.media = {PeerMedia::video("video", {{96, "VP8", 90000, 1, {}}})};
     c.dtls.enableSrtp = managed; c.enableDataChannels = managed;
+    c.dtls.congestionControl.enabled = false; // This fixture exercises explicit application-controlled pacing.
     if (managed)
     {
         c.media[0].feedback = {{std::nullopt, "nack"}, {std::nullopt, "nack pli"}, {std::nullopt, "ccm fir"}, {std::nullopt, "transport-cc"}};

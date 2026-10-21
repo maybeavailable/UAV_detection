@@ -93,7 +93,11 @@ void TrendlineEstimator::UpdateTrendline(double recv_delta_ms, double send_delta
     const auto smoothed = kSmoothingCoeff * smoothed_delay_ + (1 - kSmoothingCoeff) * accumulated;
     if (send_time_ms < 0 || arrival_time_ms < 0 || !std::isfinite(recv_delta_ms) || !std::isfinite(send_delta_ms) ||
         !std::isfinite(accumulated) || !std::isfinite(smoothed))
+    {
+        UAV_LOG_WARN << "[WebRTC][TrendlineEstimator][" << this << "] invalid sample send_ms=" << send_time_ms
+            << " arrival_ms=" << arrival_time_ms << " send_delta_ms=" << send_delta_ms << " receive_delta_ms=" << recv_delta_ms;
         throw std::invalid_argument("invalid trendline sample or timestamp");
+    }
     num_of_deltas_ = std::min(num_of_deltas_ + 1, kDeltaCounterMax);
     if (first_arrival_time_ms_ == -1) first_arrival_time_ms_ = arrival_time_ms;
     accumulated_delay_ = accumulated;
@@ -117,17 +121,25 @@ void TrendlineEstimator::UpdateTrendline(double recv_delta_ms, double send_delta
         }
     }
     Detect(trend, send_delta_ms, arrival_time_ms);
+    UAV_LOG_IF(LogLevel::TRACE, LogManager::getInstance().shouldLog(LogLevel::TRACE)) << "[WebRTC][TrendlineEstimator][" << this << "] receive_delta_ms=" << recv_delta_ms
+        << " send_delta_ms=" << send_delta_ms << " accumulated_delay_ms=" << accumulated_delay_ << " smoothed_delay_ms=" << smoothed_delay_
+        << " samples=" << delay_hist_.size() << " trend=" << trend << " threshold=" << threshold_
+        << " hypothesis=" << static_cast<int>(hypothesis_);
 }
 void TrendlineEstimator::Update(double recv_delta_ms, double send_delta_ms, std::int64_t send_time_ms,
                                 std::int64_t arrival_time_ms, std::size_t packet_size, bool calculated_deltas)
 {
-    if (send_time_ms < 0 || arrival_time_ms < 0) throw std::invalid_argument("negative trendline timestamp");
+    if (send_time_ms < 0 || arrival_time_ms < 0)
+    {
+        UAV_LOG_WARN << "[WebRTC][TrendlineEstimator][" << this << "] negative send_ms=" << send_time_ms << " arrival_ms=" << arrival_time_ms;
+        throw std::invalid_argument("negative trendline timestamp");
+    }
     if (calculated_deltas) UpdateTrendline(recv_delta_ms, send_delta_ms, send_time_ms, arrival_time_ms, packet_size);
     if (network_state_predictor_)
     {
         const auto predicted = network_state_predictor_->Update(send_time_ms, arrival_time_ms, hypothesis_);
         if (predicted != hypothesis_predicted_)
-            UAV_LOG_DEBUG << "[WebRTC][TrendlineEstimator] predicted state=" << static_cast<int>(predicted);
+            UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][TrendlineEstimator] predicted state=" << static_cast<int>(predicted);
         hypothesis_predicted_ = predicted;
     }
 }
@@ -165,7 +177,7 @@ void TrendlineEstimator::Detect(double trend, double ts_delta, std::int64_t now_
         hypothesis_ = BandwidthUsage::kBwNormal;
     }
     if (hypothesis_ != previous)
-        UAV_LOG_DEBUG << "[WebRTC][TrendlineEstimator] hypothesis=" << static_cast<int>(hypothesis_)
+        UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][TrendlineEstimator] hypothesis=" << static_cast<int>(hypothesis_)
             << " modified_trend=" << modified_trend << " threshold=" << threshold_;
     prev_trend_ = trend;
     UpdateThreshold(modified_trend, now_ms);

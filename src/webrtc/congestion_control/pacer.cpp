@@ -1,5 +1,6 @@
 #include"webrtc/congestion_control/pacer.h"
 #include"webrtc/congestion_control/interval_budget.h"
+#include"log/log.h"
 
 #include<algorithm>
 #include<array>
@@ -49,9 +50,19 @@ struct Pacer::Impl
         mediaBudget(config.rateBps), paddingBudget(std::min(config.rateBps, config.paddingRateBps)),
         lastBudgetAt(now), nextProcessAt(now), queueUpdatedAt(now)
     {
-        if (!config.validate()) throw std::invalid_argument("invalid pacer configuration");
+        if (!config.validate())
+        {
+            UAV_LOG_WARN << "[WebRTC][Pacer] invalid configuration rate_bps=" << config.rateBps
+                << " padding_bps=" << config.paddingRateBps << " process_ms=" << config.processInterval.count();
+            throw std::invalid_argument("invalid pacer configuration");
+        }
         stats.rateBps = stats.adjustedRateBps = config.rateBps;
         stats.paddingRateBps = paddingBudget.targetRateBps();
+        UAV_LOG_INFO << "[WebRTC][Pacer][" << this << "] initialized enabled=" << config.enabled
+            << " rate_bps=" << stats.rateBps << " padding_bps=" << stats.paddingRateBps
+            << " process_ms=" << config.processInterval.count() << " queue_limit_ms=" << config.queueTimeLimit.count()
+            << " expiry_ms=" << config.maxQueueDelay.count() << " pace_audio=" << config.paceAudio
+            << " account_audio=" << config.accountForAudio << " overhead_bytes=" << config.transportOverheadBytes;
     }
     std::size_t cost(const Packet& p) const { return p.wireSize + config.transportOverheadBytes; }
     bool suspended() const { return stats.paused || !stats.rateBps; }
@@ -92,6 +103,10 @@ struct Pacer::Impl
             const auto required = (numerator + left.count() - 1) / left.count();
             rate = std::max(rate, std::min(required, IntervalBudget::MaxRateBps));
         }
+        if (rate != stats.adjustedRateBps)
+            UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][Pacer][g=" << stats.generation << "] adjusted_rate_bps=" << rate
+                << " previous_bps=" << stats.adjustedRateBps << " configured_bps=" << stats.rateBps
+                << " queued_bytes=" << mediaQueuedBytes << " average_queue_us=" << averageQueueTime(now).count();
         stats.adjustedRateBps = rate;
         mediaBudget.setTargetRate(rate);
     }
@@ -107,6 +122,9 @@ struct Pacer::Impl
         paddingBudget.increaseBudget(std::min(elapsed, Microseconds(MaxProcessingInterval)));
         lastBudgetAt = now; nextProcessAt = now + config.processInterval;
         processBytes = 0; firstProcess = false;
+        UAV_LOG_IF(LogLevel::TRACE, LogManager::getInstance().shouldLog(LogLevel::TRACE)) << "[WebRTC][Pacer][g=" << stats.generation << "] process elapsed_us=" << elapsed.count()
+            << " media_budget_bytes=" << mediaBudget.signedBytesRemaining() << " padding_budget_bytes=" << paddingBudget.signedBytesRemaining()
+            << " queued_packets=" << stats.queuedPackets << " queued_bytes=" << stats.queuedBytes;
     }
     void addReady(const Key& key, Priority priority) { ready[static_cast<unsigned>(priority)].push_back(key); }
     void removeReady(const Key& key, Priority priority)
@@ -128,9 +146,10 @@ struct Pacer::Impl
         // Drain adjustment must not carry into the next frame's idle repayment.
         stats.adjustedRateBps = stats.rateBps; mediaBudget.setTargetRate(stats.rateBps);
     }
-    bool eligible(Priority priority) const
+    bool eligible(Priority priority, bool probing = false) const
     {
-        if (suspended()) return false;
+        if (suspended() || stats.congested) return false;
+        if (probing) return true;
         if (!config.enabled) return true;
         if (processBytes >= config.maxBurstBytes) return false;
         if (priority == Priority::Audio && !config.paceAudio) return true;
@@ -156,6 +175,9 @@ struct Pacer::Impl
             if (queue.empty()) it = streams.erase(it);
             else { addReady(it->first, queue.front().packet.priority); ++it; }
         }
+        if (!expired.empty())
+            UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][Pacer][g=" << stats.generation << "] expired_packets=" << expired.size()
+                << " expired_total=" << stats.expiredPackets << " queued_packets=" << stats.queuedPackets;
         emptied(); return expired;
     }
 };
@@ -165,8 +187,15 @@ Pacer::~Pacer() = default;
 bool Pacer::setRate(std::uint64_t rate, Time now) { return setRates(rate, impl_->config.paddingRateBps, now); }
 bool Pacer::setRates(std::uint64_t rate, std::uint64_t paddingRate, Time now)
 {
-    if (!validRate(rate) || !validRate(paddingRate)) return false;
+    if (!validRate(rate) || !validRate(paddingRate))
+    {
+        UAV_LOG_WARN << "[WebRTC][Pacer] invalid rates media_bps=" << rate << " padding_bps=" << paddingRate;
+        return false;
+    }
     auto& s = *impl_; s.updateQueueTime(now);
+    if (rate != s.stats.rateBps || paddingRate != s.config.paddingRateBps)
+        UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][Pacer][g=" << s.stats.generation << "] set rates media_bps=" << rate
+            << " previous_bps=" << s.stats.rateBps << " padding_bps=" << paddingRate;
     const bool wasSuspended = s.suspended();
     s.settle(now, wasSuspended || s.streams.empty());
     s.stats.rateBps = s.config.rateBps = rate; s.config.paddingRateBps = paddingRate;
@@ -180,13 +209,25 @@ bool Pacer::setRates(std::uint64_t rate, std::uint64_t paddingRate, Time now)
 void Pacer::setPaused(bool paused, Time now)
 {
     auto& s = *impl_; s.updateQueueTime(now); s.settle(now, s.suspended() || s.streams.empty());
-    if (s.stats.paused != paused) s.nextProcessAt = now + s.config.processInterval;
+    if (s.stats.paused != paused)
+    {
+        UAV_LOG_INFO << "[WebRTC][Pacer][g=" << s.stats.generation << "] paused=" << paused
+            << " queued_packets=" << s.stats.queuedPackets << " queued_bytes=" << s.stats.queuedBytes;
+        s.nextProcessAt = now + s.config.processInterval;
+    }
     s.stats.paused = paused;
 }
 Pacer::Admission Pacer::enqueue(Packet packet, Time now)
 {
     auto& s = *impl_; s.updateQueueTime(now);
-    auto reject = [&](Admission result) { ++s.stats.rejectedPackets; return result; };
+    auto reject = [&](Admission result) {
+        ++s.stats.rejectedPackets;
+        UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][Pacer][g=" << s.stats.generation << "] rejected id=" << packet.id
+            << " reason=" << static_cast<int>(result) << " packet_generation=" << packet.generation
+            << " bytes=" << packet.wireSize << " queued_packets=" << s.stats.queuedPackets
+            << " queued_bytes=" << s.stats.queuedBytes << " rejected_total=" << s.stats.rejectedPackets;
+        return result;
+    };
     if (!packet.id || !packet.wireSize || packet.wireSize > 65507 || static_cast<unsigned>(packet.priority) > 3 || s.ids.count(packet.id))
         return reject(Admission::InvalidPacket);
     if (packet.generation != s.stats.generation) return reject(Admission::GenerationMismatch);
@@ -205,10 +246,35 @@ Pacer::Admission Pacer::enqueue(Packet packet, Time now)
     queue.push_back({packet, std::max(now, s.queueUpdatedAt), s.activeTime}); s.ids.insert(packet.id);
     ++s.stats.queuedPackets; s.stats.queuedBytes += s.cost(packet); ++s.stats.enqueuedPackets;
     (packet.priority == Priority::Padding ? s.paddingQueuedBytes : s.mediaQueuedBytes) += s.cost(packet);
+    UAV_LOG_IF(LogLevel::TRACE, LogManager::getInstance().shouldLog(LogLevel::TRACE)) << "[WebRTC][Pacer][g=" << s.stats.generation << "] enqueued id=" << packet.id << " ssrc=" << packet.ssrc
+        << " priority=" << static_cast<int>(packet.priority) << " bytes=" << s.cost(packet)
+        << " queued_packets=" << s.stats.queuedPackets << " queued_bytes=" << s.stats.queuedBytes;
     return Admission::Accepted;
 }
 std::vector<Pacer::Packet> Pacer::expire(Time now) { return impl_->expire(now); }
-std::optional<Pacer::Packet> Pacer::pop(Time now)
+std::optional<Pacer::Packet> Pacer::remove(std::uint64_t id, Time now)
+{
+    auto& s = *impl_; s.updateQueueTime(now);
+    for (auto it = s.streams.begin(); it != s.streams.end(); ++it)
+    {
+        auto& queue = it->second;
+        const auto found = std::find_if(queue.begin(), queue.end(), [id](const auto& e) { return e.packet.id == id; });
+        if (found == queue.end()) continue;
+        const bool head = found == queue.begin(); const auto entry = *found;
+        if (head) s.removeReady(it->first, found->packet.priority);
+        queue.erase(found); s.removed(entry); ++s.stats.cancelledPackets;
+        if (queue.empty()) s.streams.erase(it); else if (head) s.addReady(it->first, queue.front().packet.priority);
+        s.emptied(); return entry.packet;
+    }
+    return std::nullopt;
+}
+void Pacer::setCongested(bool congested) { impl_->stats.congested = congested; }
+void Pacer::accountProbeBytes(std::size_t bytes)
+{
+    auto& s = *impl_; s.mediaBudget.useBudget(bytes); s.paddingBudget.useBudget(bytes);
+    s.processBytes += bytes; ++s.stats.releasedPackets; s.stats.releasedBytes += bytes;
+}
+std::optional<Pacer::Packet> Pacer::pop(Time now, bool probing)
 {
     auto& s = *impl_;
     if (s.streams.empty()) return std::nullopt;
@@ -218,8 +284,15 @@ std::optional<Pacer::Packet> Pacer::pop(Time now)
         if (ready.empty()) continue;
         const auto key = ready.front(); auto it = s.streams.find(key); auto& queue = it->second;
         // Owner first collects expired requests so it can complete their callbacks.
-        if (queue.front().queuedAt + s.config.maxQueueDelay <= now || !s.eligible(queue.front().packet.priority))
+        if (queue.front().queuedAt + s.config.maxQueueDelay <= now || !s.eligible(queue.front().packet.priority, probing))
+        {
+            UAV_LOG_IF(LogLevel::TRACE, LogManager::getInstance().shouldLog(LogLevel::TRACE)) << "[WebRTC][Pacer][g=" << s.stats.generation << "] release blocked id=" << queue.front().packet.id
+                << " expired=" << (queue.front().queuedAt + s.config.maxQueueDelay <= now)
+                << " paused=" << s.stats.paused << " rate_bps=" << s.stats.rateBps
+                << " burst_bytes=" << s.processBytes << " media_budget_bytes=" << s.mediaBudget.signedBytesRemaining()
+                << " padding_budget_bytes=" << s.paddingBudget.signedBytesRemaining();
             return std::nullopt;
+        }
         ready.pop_front(); const auto entry = queue.front(); queue.pop_front();
         if (queue.empty()) s.streams.erase(it); else s.addReady(key, queue.front().packet.priority);
         s.removed(entry); const auto& packet = entry.packet;
@@ -228,6 +301,11 @@ std::optional<Pacer::Packet> Pacer::pop(Time now)
         { s.mediaBudget.useBudget(bytes); s.paddingBudget.useBudget(bytes); }
         s.processBytes += bytes;
         ++s.stats.releasedPackets; s.stats.releasedBytes += bytes;
+        UAV_LOG_IF(LogLevel::TRACE, LogManager::getInstance().shouldLog(LogLevel::TRACE)) << "[WebRTC][Pacer][g=" << s.stats.generation << "] released id=" << packet.id
+            << " priority=" << static_cast<int>(packet.priority) << " bytes=" << bytes
+            << " wait_us=" << std::chrono::duration_cast<Microseconds>(now - entry.queuedAt).count()
+            << " media_budget_bytes=" << s.mediaBudget.signedBytesRemaining() << " padding_budget_bytes=" << s.paddingBudget.signedBytesRemaining()
+            << " queued_packets=" << s.stats.queuedPackets;
         s.emptied(); return packet;
     }
     return std::nullopt;
@@ -237,7 +315,7 @@ std::optional<Pacer::Time> Pacer::nextWakeup(Time now)
     auto& s = *impl_; if (s.streams.empty()) return std::nullopt;
     auto next = Time::max();
     for (const auto& stream : s.streams) next = std::min(next, stream.second.front().queuedAt + s.config.maxQueueDelay);
-    if (!s.suspended())
+    if (!s.suspended() && !s.stats.congested)
     {
         const Impl::Entry* head = nullptr;
         for (const auto& ready : s.ready) if (!ready.empty()) { head = &s.streams.at(ready.front()).front(); break; }
@@ -268,6 +346,8 @@ std::vector<Pacer::Packet> Pacer::clear(Time now)
 {
     auto& s = *impl_; std::vector<Packet> cancelled; cancelled.reserve(s.stats.queuedPackets);
     for (const auto& stream : s.streams) for (const auto& e : stream.second) cancelled.push_back(e.packet);
+    UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][Pacer][g=" << s.stats.generation << "] clear cancelled_packets=" << cancelled.size()
+        << " released_total=" << s.stats.releasedPackets << " expired_total=" << s.stats.expiredPackets;
     s.stats.cancelledPackets += cancelled.size(); s.stats.queuedBytes = s.stats.queuedPackets = 0;
     s.streams.clear(); s.ids.clear(); for (auto& list : s.ready) list.clear();
     s.mediaBudget.reset(); s.paddingBudget.reset(); s.mediaBudget.setTargetRate(s.stats.rateBps);
@@ -279,6 +359,7 @@ std::vector<Pacer::Packet> Pacer::clear(Time now)
 }
 std::vector<Pacer::Packet> Pacer::reset(std::uint64_t generation, Time now)
 {
+    UAV_LOG_INFO << "[WebRTC][Pacer] reset generation=" << generation << " previous_generation=" << impl_->stats.generation;
     auto cancelled = clear(now); auto& s = *impl_;
     const auto rate = s.stats.rateBps, paddingRate = s.stats.paddingRateBps; const auto paused = s.stats.paused;
     s.stats = {}; s.stats.generation = generation; s.stats.rateBps = s.stats.adjustedRateBps = rate;

@@ -87,7 +87,13 @@ struct TransportFeedbackAdapter::Impl
     explicit Impl(Config c) : config(c)
     {
         if (c.history_age.count() < 1 || c.history_age > std::chrono::hours(1) || !c.max_history || c.max_history > 32768)
+        {
+            UAV_LOG_WARN << "[WebRTC][TransportAdapter] invalid history limits age_ms=" << c.history_age.count()
+                << " max_packets=" << c.max_history;
             throw std::invalid_argument("invalid transport feedback history limits");
+        }
+        UAV_LOG_INFO << "[WebRTC][TransportAdapter][" << this << "] initialized history_age_ms="
+            << config.history_age.count() << " max_packets=" << config.max_history;
     }
     std::int64_t sequence(std::uint16_t value)
     {
@@ -118,18 +124,34 @@ struct TransportFeedbackAdapter::Impl
         const bool retransmit = p.sent.send_time.has_value();
         p.sent.send_time = at; last_send_time = last_send_time ? std::max(*last_send_time, at) : at;
         p.sent.prior_unacked_data = addSize(p.sent.prior_unacked_data, pending_untracked_size); pending_untracked_size = 0;
-        if (retransmit) { p.ambiguous_receive_time = true; ++stats.retransmissions; return false; }
+        if (retransmit)
+        {
+            p.ambiguous_receive_time = true; ++stats.retransmissions;
+            UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][TransportAdapter][g=" << stats.generation << "] retransmitted seq="
+                << p.sent.sequence_number << " send_us=" << std::chrono::duration_cast<Us>(at.time_since_epoch()).count()
+                << " ambiguous_receive_time=true";
+            return false;
+        }
         if (p.sent.sequence_number > last_ack_seq_num)
         { in_flight[p.network_route] += p.sent.size; p.in_flight = true; }
-        p.sent.data_in_flight = outstanding(); ++stats.sent_packets; return true;
+        p.sent.data_in_flight = outstanding(); ++stats.sent_packets;
+        UAV_LOG_IF(LogLevel::TRACE, LogManager::getInstance().shouldLog(LogLevel::TRACE)) << "[WebRTC][TransportAdapter][g=" << stats.generation << "] sent seq=" << p.sent.sequence_number
+            << " send_us=" << std::chrono::duration_cast<Us>(at.time_since_epoch()).count()
+            << " bytes=" << p.sent.size << " prior_unacked_bytes=" << p.sent.prior_unacked_data
+            << " in_flight_bytes=" << p.sent.data_in_flight << " cluster_id=" << p.sent.pacing_info.probe_cluster_id;
+        return true;
     }
     void prune(Time now, std::size_t limit)
     {
+        const auto before = history.size();
         while (!history.empty() && (history.size() > limit || now - history.begin()->second.creation_time > config.history_age))
         {
             auto& p = history.begin()->second; removeInFlight(p); removeIndex(p);
             history.erase(history.begin()); ++stats.expired_packets;
         }
+        if (before != history.size())
+            UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][TransportAdapter][g=" << stats.generation << "] pruned=" << before - history.size()
+                << " history_packets=" << history.size() << " in_flight_bytes=" << outstanding();
     }
     std::optional<PacketFeedback> retrieve(std::int64_t seq, bool received)
     {
@@ -161,9 +183,19 @@ TransportFeedbackAdapter::TransportFeedbackAdapter(Config config) : impl_(std::m
 TransportFeedbackAdapter::~TransportFeedbackAdapter() = default;
 bool TransportFeedbackAdapter::AddPacket(const RtpPacketSendInfo& info, const PacedPacketInfo& pacing, std::size_t overhead, Time created)
 {
-    if (!info.packet_size || info.packet_size > 65507 || overhead > 512) return false;
+    if (!info.packet_size || info.packet_size > 65507 || overhead > 512)
+    {
+        UAV_LOG_WARN << "[WebRTC][TransportAdapter] invalid packet seq=" << info.transport_sequence_number
+            << " bytes=" << info.packet_size << " overhead_bytes=" << overhead;
+        return false;
+    }
     auto& s = *impl_; const auto seq = s.sequence(info.transport_sequence_number);
-    if (seq < 0 || s.history.count(seq)) return false;
+    if (seq < 0 || s.history.count(seq))
+    {
+        UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][TransportAdapter][g=" << s.stats.generation << "] registration rejected seq="
+            << seq << " duplicate_or_old=true";
+        return false;
+    }
     s.prune(created, s.config.max_history - 1);
     Impl::PacketFeedback packet; packet.creation_time = created; packet.network_route = s.route;
     packet.sent.sequence_number = seq; packet.sent.size = info.packet_size + overhead; packet.sent.audio = info.audio;
@@ -178,16 +210,28 @@ bool TransportFeedbackAdapter::AddPacket(const RtpPacketSendInfo& info, const Pa
     }
     // Retransmission without an independent original/RTX mapping is ambiguous.
     if (info.is_retransmission && (!info.original_ssrc || *info.original_ssrc == info.ssrc)) packet.ambiguous_receive_time = true;
-    s.history.emplace(seq, std::move(packet)); ++s.stats.registered_packets; return true;
+    s.history.emplace(seq, std::move(packet)); ++s.stats.registered_packets;
+    UAV_LOG_IF(LogLevel::TRACE, LogManager::getInstance().shouldLog(LogLevel::TRACE)) << "[WebRTC][TransportAdapter][g=" << s.stats.generation << "] registered seq=" << seq
+        << " ssrc=" << info.ssrc << " rtp_seq=" << info.rtp_sequence_number << " wire_bytes=" << info.packet_size
+        << " overhead_bytes=" << overhead << " cluster_id=" << pacing.probe_cluster_id << " history_packets=" << s.history.size();
+    return true;
 }
 std::optional<SentPacket> TransportFeedbackAdapter::ProcessSentPacket(const SentPacketInfo& info)
 {
     auto& s = *impl_;
     if (info.info.included_in_feedback || info.packet_id != -1)
     {
-        if (info.packet_id < 0 || info.packet_id > 65535) return std::nullopt;
+        if (info.packet_id < 0 || info.packet_id > 65535)
+        {
+            UAV_LOG_WARN << "[WebRTC][TransportAdapter] invalid sent packet_id=" << info.packet_id;
+            return std::nullopt;
+        }
         const auto it = s.history.find(s.sequence(static_cast<std::uint16_t>(info.packet_id)));
-        if (it == s.history.end()) return std::nullopt;
+        if (it == s.history.end())
+        {
+            UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][TransportAdapter][g=" << s.stats.generation << "] sent packet history missing id=" << info.packet_id;
+            return std::nullopt;
+        }
         if (s.sent(it->second, info.send_time)) return it->second.sent;
         return std::nullopt;
     }
@@ -195,13 +239,22 @@ std::optional<SentPacket> TransportFeedbackAdapter::ProcessSentPacket(const Sent
     {
         s.pending_untracked_size = addSize(s.pending_untracked_size, info.info.packet_size_bytes);
         s.last_untracked_send_time = s.last_untracked_send_time ? std::max(*s.last_untracked_send_time, info.send_time) : info.send_time;
+        UAV_LOG_IF(LogLevel::TRACE, LogManager::getInstance().shouldLog(LogLevel::TRACE)) << "[WebRTC][TransportAdapter][g=" << s.stats.generation << "] untracked_sent_bytes="
+            << info.info.packet_size_bytes << " pending_untracked_bytes=" << s.pending_untracked_size;
     }
     return std::nullopt;
 }
 std::optional<TransportPacketsFeedback> TransportFeedbackAdapter::ProcessTransportFeedback(const RtcpTwcc& f, Time now)
 {
     auto& s = *impl_;
-    if (!valid(f)) { ++s.stats.malformed_feedback; return std::nullopt; }
+    if (!valid(f))
+    {
+        ++s.stats.malformed_feedback;
+        UAV_LOG_WARN << "[WebRTC][TransportAdapter][g=" << s.stats.generation << "] malformed TWCC feedback="
+            << unsigned(f.feedbackCount) << " statuses=" << f.deltas.size() << " reference_time=" << f.referenceTime
+            << " malformed_total=" << s.stats.malformed_feedback;
+        return std::nullopt;
+    }
     s.prune(now, s.config.max_history);
     const auto reference = s.remote_reference ? unwrap(f.referenceTime, *s.remote_reference, 24) :
         (f.referenceTime & 0x800000 ? std::int64_t(f.referenceTime) - 0x1000000 : std::int64_t(f.referenceTime));
@@ -209,6 +262,8 @@ std::optional<TransportPacketsFeedback> TransportFeedbackAdapter::ProcessTranspo
     else
     {
         const auto delta = Us((reference - *s.remote_reference) * 64000);
+        if (delta < Time{} - *s.current_offset)
+            UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][TransportAdapter][g=" << s.stats.generation << "] reference clock rebased delta_us=" << delta.count();
         s.current_offset = delta < Time{} - *s.current_offset ? now : *s.current_offset + delta;
     }
     s.remote_reference = reference;
@@ -230,31 +285,52 @@ std::optional<TransportPacketsFeedback> TransportFeedbackAdapter::ProcessTranspo
         p.reported_recovered_for_the_first_time = received && packet->previously_reported_lost;
         if (received)
         { p.receive_time = *s.current_offset + Us(floorMs(offset)); p.remote_arrival_us = reference * 64000 + offset; }
+        UAV_LOG_IF(LogLevel::TRACE, LogManager::getInstance().shouldLog(LogLevel::TRACE)) << "[WebRTC][TransportAdapter][g=" << s.stats.generation << "] feedback seq=" << seq
+            << " received=" << received << " send_us=" << std::chrono::duration_cast<Us>(p.sent_packet.send_time->time_since_epoch()).count()
+            << " remote_arrival_us=" << p.remote_arrival_us.value_or(-1) << " lost_first=" << p.reported_lost_for_the_first_time
+            << " recovered_first=" << p.reported_recovered_for_the_first_time << " ambiguous=" << p.ambiguous_receive_time;
         result.packet_feedbacks.push_back(std::move(p));
     }
     s.stats.failed_lookups += failed; s.stats.ignored_route_packets += ignored; ++s.stats.feedback_packets;
+    UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][TransportAdapter][g=" << result.generation << "] feedback=" << unsigned(f.feedbackCount)
+        << " base_seq=" << base << " statuses=" << f.deltas.size() << " matched=" << result.packet_feedbacks.size()
+        << " missing_history=" << failed << " ignored_route=" << ignored << " in_flight_bytes=" << s.outstanding();
     // Lost results intentionally repeat in the raw upstream view; received
     // results are removed from history, so duplicates cannot be delivered twice.
     if (result.packet_feedbacks.empty()) return std::nullopt;
     result.data_in_flight = s.outstanding();
-    UAV_LOG_DEBUG << "[WebRTC][TransportAdapter][g=" << result.generation << "] feedback=" << unsigned(f.feedbackCount)
-        << " packets=" << result.packet_feedbacks.size() << " in_flight=" << result.data_in_flight;
     return result;
 }
 bool TransportFeedbackAdapter::ProcessRtcp(const RtcpBytes& bytes, Time now, std::vector<TransportPacketsFeedback>& out)
 {
     std::vector<RtcpMessage> messages;
-    if (!parseRtcp(bytes.data(), bytes.size(), messages)) { ++impl_->stats.malformed_feedback; return false; }
+    if (!parseRtcp(bytes.data(), bytes.size(), messages))
+    {
+        ++impl_->stats.malformed_feedback;
+        UAV_LOG_WARN << "[WebRTC][TransportAdapter][g=" << impl_->stats.generation << "] malformed RTCP bytes="
+            << bytes.size() << " malformed_total=" << impl_->stats.malformed_feedback;
+        return false;
+    }
     std::vector<TransportPacketsFeedback> results;
     for (const auto& message : messages) if (const auto* twcc = std::get_if<RtcpTwcc>(&message))
         if (auto result = ProcessTransportFeedback(*twcc, now)) results.push_back(std::move(*result));
     out = std::move(results); return true;
 }
-void TransportFeedbackAdapter::SetNetworkRoute(const TransportNetworkRoute& route) { impl_->route = route; }
+void TransportFeedbackAdapter::SetNetworkRoute(const TransportNetworkRoute& route)
+{
+    if (!(impl_->route == route))
+        UAV_LOG_INFO << "[WebRTC][TransportAdapter][g=" << impl_->stats.generation << "] route changed local_network="
+            << route.local_network_id << " remote_network=" << route.remote_network_id << " local_adapter=" << route.local_adapter_id
+            << " remote_adapter=" << route.remote_adapter_id << " local_turn=" << route.local_uses_turn
+            << " remote_turn=" << route.remote_uses_turn << " connected=" << route.connected;
+    impl_->route = route;
+}
 std::size_t TransportFeedbackAdapter::GetOutstandingData() const { return impl_->outstanding(); }
 bool TransportFeedbackAdapter::RemovePacket(std::int64_t sequence)
 {
     auto& s = *impl_; const auto it = s.history.find(sequence); if (it == s.history.end()) return false;
+    UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][TransportAdapter][g=" << s.stats.generation << "] removing failed send seq="
+        << sequence << " bytes=" << it->second.sent.size;
     s.removeInFlight(it->second); s.removeIndex(it->second); s.history.erase(it); ++s.stats.failed_sends; return true;
 }
 bool TransportFeedbackAdapter::MarkRetransmitted(std::int64_t sequence, Time at)
@@ -264,9 +340,19 @@ bool TransportFeedbackAdapter::MarkRetransmitted(std::int64_t sequence, Time at)
     s.sent(it->second, at); return true;
 }
 void TransportFeedbackAdapter::Prune(Time now) { impl_->prune(now, impl_->config.max_history); }
-void TransportFeedbackAdapter::Clear() { impl_->clear(); }
+void TransportFeedbackAdapter::Clear()
+{
+    UAV_LOG_INFO << "[WebRTC][TransportAdapter][g=" << impl_->stats.generation << "] clear history_packets="
+        << impl_->history.size() << " in_flight_bytes=" << impl_->outstanding();
+    impl_->clear();
+}
 void TransportFeedbackAdapter::Reset(std::uint64_t generation)
-{ auto& s = *impl_; s.clear(true); s.sequence_anchor.reset(); s.route = {}; s.stats = {}; s.stats.generation = generation; }
+{
+    auto& s = *impl_;
+    UAV_LOG_INFO << "[WebRTC][TransportAdapter] reset generation=" << generation << " previous_generation=" << s.stats.generation
+        << " history_packets=" << s.history.size() << " sent_total=" << s.stats.sent_packets << " feedback_total=" << s.stats.feedback_packets;
+    s.clear(true); s.sequence_anchor.reset(); s.route = {}; s.stats = {}; s.stats.generation = generation;
+}
 TransportAdapterStats TransportFeedbackAdapter::Snapshot() const
 {
     auto result = impl_->stats; result.history_size = impl_->history.size(); result.data_in_flight = impl_->outstanding();
@@ -278,20 +364,41 @@ std::vector<TransportPacketDelta> TransportFeedbackDeltaCalculator::Calculate(co
     std::vector<TransportPacketDelta> result;
     for (const auto& packet : feedback.SortedByReceiveTime())
     {
-        if (packet.ambiguous_receive_time) continue;
+        if (packet.ambiguous_receive_time)
+        {
+            UAV_LOG_IF(LogLevel::TRACE, LogManager::getInstance().shouldLog(LogLevel::TRACE)) << "[WebRTC][TransportDelta][g=" << feedback.generation << "] skipped ambiguous seq=" << packet.sent_packet.sequence_number;
+            continue;
+        }
         if (previous_)
         {
             if (packet.sent_packet.sequence_number <= previous_->sent_packet.sequence_number ||
-                *packet.sent_packet.send_time < *previous_->sent_packet.send_time || *packet.receive_time < *previous_->receive_time) continue;
+                *packet.sent_packet.send_time < *previous_->sent_packet.send_time || *packet.receive_time < *previous_->receive_time)
+            {
+                UAV_LOG_IF(LogLevel::TRACE, LogManager::getInstance().shouldLog(LogLevel::TRACE)) << "[WebRTC][TransportDelta][g=" << feedback.generation << "] skipped reordered seq="
+                    << packet.sent_packet.sequence_number << " previous_seq=" << previous_->sent_packet.sequence_number;
+                continue;
+            }
             const auto sent = std::chrono::duration_cast<Us>(*packet.sent_packet.send_time - *previous_->sent_packet.send_time);
             const auto received = packet.remote_arrival_us && previous_->remote_arrival_us ?
                 Us(*packet.remote_arrival_us - *previous_->remote_arrival_us) : std::chrono::duration_cast<Us>(*packet.receive_time - *previous_->receive_time);
-            if (received.count() < 0) continue;
+            if (received.count() < 0)
+            {
+                UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][TransportDelta][g=" << feedback.generation << "] negative receive_delta_us="
+                    << received.count() << " seq=" << packet.sent_packet.sequence_number;
+                continue;
+            }
             result.push_back({previous_->sent_packet.sequence_number, packet.sent_packet.sequence_number, sent, received, received - sent});
+            UAV_LOG_IF(LogLevel::TRACE, LogManager::getInstance().shouldLog(LogLevel::TRACE)) << "[WebRTC][TransportDelta][g=" << feedback.generation << "] previous_seq=" << previous_->sent_packet.sequence_number
+                << " seq=" << packet.sent_packet.sequence_number << " send_delta_us=" << sent.count()
+                << " receive_delta_us=" << received.count() << " delay_delta_us=" << (received - sent).count();
         }
         previous_ = packet;
     }
     return result;
 }
-void TransportFeedbackDeltaCalculator::Reset() { previous_.reset(); generation_.reset(); }
+void TransportFeedbackDeltaCalculator::Reset()
+{
+    UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][TransportDelta] reset previous_generation=" << generation_.value_or(0);
+    previous_.reset(); generation_.reset();
+}
 } // namespace webrtc

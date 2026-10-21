@@ -103,6 +103,8 @@ io.run();
 
 `onRtpPacket` / `onRtcpPacket` 只交付通过认证和重放检查的完整明文，并保留组件、来源和 generation。认证失败、重放、非法包、错误来源或旧代媒体被丢弃，通过 `Snapshot::srtp/srtcp` 和 `stats.discardedMediaPackets` 查看计数。控制器配置与边界见 [SRTP/SRTCP](srtp-control.md)。
 
+内置媒体发送默认启动 [GCC](goog-cc-network-control.md)：`Config::congestionControl` 配置初始码率、约束、探测和 padding；transport 串起同一个 RTCP adapter、实际发送记录、TWCC/RR/RTT/REMB、25 ms tick、Pacer 和探测执行。`onTargetTransferRate` 向编码端交付目标码率及回压丢帧比例，`Snapshot::congestionControl` 提供运行状态。动态接口为 `setBitrateConstraints`、`setStreamsConfig`、`setNetworkStateEstimate`，PeerConnection 提供对应转发。GCC 活动时手动设置 pacing 速率返回 `operation_not_supported`；`setPacingPaused` 仍可使用。关闭 `congestionControl.enabled` 可使用原手动模式。
+
 默认 `enableSrtp=false` 保留外部媒体保护模式；该模式下调用本 transport 的媒体明文发送接口返回 `operation_not_supported`。Sender 在内置模式下应使用 ICE 的通用 `asyncSend`，让完整 SRTP/SRTCP 直接进入 UDP。
 
 `exportKeyingMaterial` 提供其他协议的异步 RFC 5705 exporter，只有 Connected 后可用。`nullopt` 表示没有 context，空 Bytes 表示存在一个零长度 context，两者在 DTLS 1.2 中不同。长度、标签及保留标签由接口和 OpenSSL 验证。

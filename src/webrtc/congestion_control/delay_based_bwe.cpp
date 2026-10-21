@@ -26,7 +26,10 @@ std::int64_t millis(Time time)
 DelayBasedBwe::Config checkedConfig(DelayBasedBwe::Config config)
 {
     if (config.separate_audio.packet_threshold < 0 || config.separate_audio.time_threshold < Delta::zero())
+    {
+        UAV_LOG_WARN << "[WebRTC][DelayBasedBwe] invalid separate audio settings";
         throw std::invalid_argument("invalid separate audio packet detection settings");
+    }
     config.aimd.send_side = true;
     return config;
 }
@@ -47,7 +50,10 @@ void DelayBasedBwe::ValidateTime(Time at_time) const
 {
     if (at_time.time_since_epoch() < Time::duration::zero() ||
         (last_control_time_ && micros(at_time) < *last_control_time_))
+    {
+        UAV_LOG_WARN << "[WebRTC][DelayBasedBwe][" << this << "] invalid control timestamp";
         throw std::invalid_argument("DelayBasedBwe requires nonnegative, nondecreasing feedback timestamps");
+    }
 }
 DelayBasedBwe::Result DelayBasedBwe::IncomingPacketFeedbackVector(const TransportPacketsFeedback& msg,
     std::optional<std::uint64_t> acked, std::optional<std::uint64_t> probe,
@@ -56,7 +62,7 @@ DelayBasedBwe::Result DelayBasedBwe::IncomingPacketFeedbackVector(const Transpor
     const auto packets = msg.SortedByReceiveTime();
     if (packets.empty())
     {
-        UAV_LOG_DEBUG << "[WebRTC][DelayBasedBwe] feedback has no received packets with send history";
+        UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][DelayBasedBwe] feedback has no received packets with send history";
         return {};
     }
     ValidateTime(msg.feedback_time);
@@ -67,7 +73,11 @@ DelayBasedBwe::Result DelayBasedBwe::IncomingPacketFeedbackVector(const Transpor
         if (packet.sent_packet.send_time->time_since_epoch() < Time::duration::zero() ||
             packet.receive_time->time_since_epoch() < Time::duration::zero() ||
             packet.sent_packet.size > static_cast<std::size_t>(std::numeric_limits<int>::max()))
+        {
+            UAV_LOG_WARN << "[WebRTC][DelayBasedBwe][" << this << "] invalid packet seq="
+                << packet.sent_packet.sequence_number << " bytes=" << packet.sent_packet.size;
             throw std::invalid_argument("invalid DelayBasedBwe packet timestamp or size");
+        }
     }
     bool recovered = false;
     auto previous = active_detector_->State();
@@ -81,6 +91,11 @@ DelayBasedBwe::Result DelayBasedBwe::IncomingPacketFeedbackVector(const Transpor
     rate_control_.SetInApplicationLimitedRegion(in_alr);
     rate_control_.SetNetworkStateEstimate(network);
     const auto result = MaybeUpdateEstimate(acked, probe, recovered, msg.feedback_time);
+    UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][DelayBasedBwe][" << this << "] feedback generation=" << msg.generation
+        << " packets=" << packets.size() << " acknowledged_available=" << acked.has_value() << " acknowledged_bps=" << acked.value_or(0)
+        << " probe_available=" << probe.has_value() << " probe_bps=" << probe.value_or(0) << " in_alr=" << in_alr
+        << " updated=" << result.updated << " target_bps=" << result.target_bitrate << " accepted_probe=" << result.probe
+        << " recovered=" << result.recovered_from_overuse << " detector_state=" << static_cast<int>(result.delay_detector_state);
     last_control_time_ = micros(msg.feedback_time);
     return result;
 }
@@ -95,10 +110,11 @@ void DelayBasedBwe::IncomingPacketFeedback(const PacketResult& packet, Time at_t
         audio_detector_ = std::make_unique<TrendlineEstimator>(config_.trendline, predictor_);
         active_detector_ = video_detector_.get();
         if (last_seen_packet_)
-            UAV_LOG_DEBUG << "[WebRTC][DelayBasedBwe] stream timed out, rebuilding delay detectors";
+            UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][DelayBasedBwe] stream timed out, rebuilding delay detectors";
     }
     last_seen_packet_ = now;
     auto* detector = video_detector_.get();
+    const auto* previous_detector = active_detector_;
     const auto receive = micros(*packet.receive_time);
     if (config_.separate_audio.enabled)
     {
@@ -117,6 +133,9 @@ void DelayBasedBwe::IncomingPacketFeedback(const PacketResult& packet, Time at_t
             active_detector_ = video_detector_.get();
         }
     }
+    if (active_detector_ != previous_detector)
+        UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][DelayBasedBwe][" << this << "] active_detector="
+            << (active_detector_ == audio_detector_.get() ? "audio" : "video");
     auto* inter_arrival = config_.separate_audio.enabled && packet.sent_packet.audio
         ? audio_inter_arrival_.get() : video_inter_arrival_.get();
     Delta send_delta{0}, receive_delta{0};
@@ -131,6 +150,8 @@ std::uint64_t DelayBasedBwe::TriggerOveruse(Time at_time, std::optional<std::uin
 {
     ValidateTime(at_time);
     const auto rate = rate_control_.Update({BandwidthUsage::kBwOverusing, capacity}, at_time);
+    UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][DelayBasedBwe][" << this << "] forced overuse capacity_available=" << capacity.has_value()
+        << " capacity_bps=" << capacity.value_or(0) << " target_bps=" << rate;
     last_control_time_ = micros(at_time);
     return rate;
 }
@@ -140,6 +161,7 @@ DelayBasedBwe::Result DelayBasedBwe::MaybeUpdateEstimate(std::optional<std::uint
     Result result;
     if (active_detector_->State() == BandwidthUsage::kBwOverusing)
     {
+        if (probe) UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][DelayBasedBwe][" << this << "] ignored probe while overusing probe_bps=" << *probe;
         if (acked && rate_control_.TimeToReduceFurther(at_time, *acked))
             result.updated = UpdateEstimate(at_time, acked, &result.target_bitrate);
         else if (!acked && rate_control_.ValidEstimate() && rate_control_.InitialTimeToReduceFurther(at_time))
@@ -147,6 +169,7 @@ DelayBasedBwe::Result DelayBasedBwe::MaybeUpdateEstimate(std::optional<std::uint
             rate_control_.SetEstimate(rate_control_.LatestEstimate() / 2, at_time);
             result.updated = true;
             result.target_bitrate = rate_control_.LatestEstimate();
+            UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][DelayBasedBwe][" << this << "] no acknowledged rate, halved target_bps=" << result.target_bitrate;
         }
     }
     else if (probe)
@@ -154,7 +177,7 @@ DelayBasedBwe::Result DelayBasedBwe::MaybeUpdateEstimate(std::optional<std::uint
         result.probe = result.updated = true;
         rate_control_.SetEstimate(*probe, at_time);
         result.target_bitrate = rate_control_.LatestEstimate();
-        UAV_LOG_DEBUG << "[WebRTC][DelayBasedBwe] accepted probe_bps=" << *probe << " target_bps=" << result.target_bitrate;
+        UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][DelayBasedBwe] accepted probe_bps=" << *probe << " target_bps=" << result.target_bitrate;
     }
     else
     {
@@ -165,9 +188,12 @@ DelayBasedBwe::Result DelayBasedBwe::MaybeUpdateEstimate(std::optional<std::uint
     if ((result.updated && prev_bitrate_ != result.target_bitrate) || state != prev_state_)
     {
         if (state != prev_state_)
-            UAV_LOG_DEBUG << "[WebRTC][DelayBasedBwe] detector_state=" << static_cast<int>(state)
+            UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][DelayBasedBwe] detector_state=" << static_cast<int>(state)
                 << " previous_state=" << static_cast<int>(prev_state_)
                 << " target_bps=" << (result.updated ? result.target_bitrate : prev_bitrate_);
+        if (result.updated && prev_bitrate_ != result.target_bitrate)
+            UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][DelayBasedBwe][" << this << "] target_bps=" << result.target_bitrate
+                << " previous_bps=" << prev_bitrate_ << " probe=" << result.probe;
         if (result.updated) prev_bitrate_ = result.target_bitrate;
         prev_state_ = state;
     }

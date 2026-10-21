@@ -55,11 +55,13 @@ void AimdRateControl::SetStartBitrate(std::uint64_t bitrate)
 {
     current_bitrate_ = latest_throughput_ = bitrate;
     initialized_ = true; // Like upstream, this setter does not clamp or reset history.
+    UAV_LOG_INFO << "[WebRTC][AimdRateControl][" << this << "] start_bps=" << bitrate;
 }
 void AimdRateControl::SetMinBitrate(std::uint64_t bitrate)
 {
     min_bitrate_ = bitrate;
     current_bitrate_ = std::max(bitrate, current_bitrate_);
+    UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][AimdRateControl][" << this << "] minimum_bps=" << bitrate << " target_bps=" << current_bitrate_;
 }
 AimdRateControl::Delta AimdRateControl::GetFeedbackInterval() const
 {
@@ -72,7 +74,10 @@ void AimdRateControl::ValidateTime(Time at_time) const
 {
     if (at_time.time_since_epoch() < Time::duration::zero() ||
         (last_update_time_ && micros(at_time) < *last_update_time_))
+    {
+        UAV_LOG_WARN << "[WebRTC][AimdRateControl][" << this << "] invalid control timestamp";
         throw std::invalid_argument("AIMD requires nonnegative, nondecreasing control timestamps");
+    }
 }
 bool AimdRateControl::TimeToReduceFurther(Time at_time, std::uint64_t throughput) const
 {
@@ -93,7 +98,11 @@ std::uint64_t AimdRateControl::LatestEstimate() const { return current_bitrate_;
 void AimdRateControl::SetRtt(Delta rtt)
 {
     if (rtt < Delta::zero() || rtt.count() > (std::numeric_limits<std::int64_t>::max() / 2 - 100000))
+    {
+        UAV_LOG_WARN << "[WebRTC][AimdRateControl][" << this << "] invalid rtt_us=" << rtt.count();
         throw std::invalid_argument("invalid AIMD RTT");
+    }
+    if (rtt_ != rtt) UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][AimdRateControl][" << this << "] rtt_us=" << rtt.count();
     rtt_ = rtt;
 }
 std::uint64_t AimdRateControl::Update(const RateControlInput& input, Time at_time)
@@ -101,7 +110,10 @@ std::uint64_t AimdRateControl::Update(const RateControlInput& input, Time at_tim
     ValidateTime(at_time);
     if (input.bw_state != BandwidthUsage::kBwNormal && input.bw_state != BandwidthUsage::kBwUnderusing &&
         input.bw_state != BandwidthUsage::kBwOverusing)
+    {
+        UAV_LOG_WARN << "[WebRTC][AimdRateControl][" << this << "] invalid bandwidth_usage=" << static_cast<int>(input.bw_state);
         throw std::invalid_argument("invalid AIMD bandwidth usage state");
+    }
     const auto now = micros(at_time);
     if (!initialized_)
     {
@@ -113,21 +125,35 @@ std::uint64_t AimdRateControl::Update(const RateControlInput& input, Time at_tim
         {
             current_bitrate_ = *input.estimated_throughput;
             initialized_ = true;
+            UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][AimdRateControl][" << this << "] initialized from throughput_bps=" << current_bitrate_;
         }
     }
     ChangeBitrate(input, now);
     last_update_time_ = now;
     return current_bitrate_;
 }
-void AimdRateControl::SetInApplicationLimitedRegion(bool in_alr) { in_alr_ = in_alr; }
+void AimdRateControl::SetInApplicationLimitedRegion(bool in_alr)
+{
+    if (in_alr_ != in_alr) UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][AimdRateControl][" << this << "] in_alr=" << in_alr;
+    in_alr_ = in_alr;
+}
 void AimdRateControl::SetEstimate(std::uint64_t bitrate, Time at_time)
 {
     ValidateTime(at_time);
     initialized_ = true;
     current_bitrate_ = ClampBitrate(bitrate);
     last_bitrate_change_ = last_update_time_ = micros(at_time);
+    UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][AimdRateControl][" << this << "] set estimate requested_bps=" << bitrate << " target_bps=" << current_bitrate_;
 }
-void AimdRateControl::SetNetworkStateEstimate(std::optional<NetworkStateEstimate> estimate) { network_estimate_ = estimate; }
+void AimdRateControl::SetNetworkStateEstimate(std::optional<NetworkStateEstimate> estimate)
+{
+    UAV_LOG_IF(LogLevel::TRACE, LogManager::getInstance().shouldLog(LogLevel::TRACE)) << "[WebRTC][AimdRateControl][" << this << "] network_estimate=" << estimate.has_value()
+        << " lower_available=" << (estimate && estimate->link_capacity_lower.has_value())
+        << " lower_bps=" << (estimate ? estimate->link_capacity_lower.value_or(0) : 0)
+        << " upper_available=" << (estimate && estimate->link_capacity_upper.has_value())
+        << " upper_bps=" << (estimate ? estimate->link_capacity_upper.value_or(0) : 0);
+    network_estimate_ = estimate;
+}
 double AimdRateControl::GetNearMaxIncreaseRateBpsPerSecond() const
 {
     // Source: one 1/30 s frame (33333 us), nearest whole bytes. Split the
@@ -147,6 +173,7 @@ void AimdRateControl::ChangeBitrate(const RateControlInput& input, Delta now)
     if (input.estimated_throughput) latest_throughput_ = throughput;
     if (!initialized_ && input.bw_state != BandwidthUsage::kBwOverusing) return;
 
+    const auto previous_state = state_;
     switch (input.bw_state)
     {
     case BandwidthUsage::kBwNormal:
@@ -196,9 +223,11 @@ void AimdRateControl::ChangeBitrate(const RateControlInput& input, Delta now)
     }
     const auto previous = current_bitrate_;
     current_bitrate_ = ClampBitrate(next);
-    if (current_bitrate_ < previous)
-        UAV_LOG_DEBUG << "[WebRTC][AimdRateControl] decreased target_bps=" << current_bitrate_
-            << " previous_bps=" << previous << " acknowledged_bps=" << throughput;
+    if (current_bitrate_ != previous || previous_state != state_)
+        UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][AimdRateControl][" << this << "] target_bps=" << current_bitrate_
+            << " previous_bps=" << previous << " acknowledged_bps=" << throughput
+            << " bandwidth_usage=" << static_cast<int>(input.bw_state) << " previous_state=" << static_cast<int>(previous_state)
+            << " state=" << static_cast<int>(state_) << " in_alr=" << in_alr_;
 }
 std::uint64_t AimdRateControl::ClampBitrate(std::uint64_t bitrate) const
 {

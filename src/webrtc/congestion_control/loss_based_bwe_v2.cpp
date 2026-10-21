@@ -326,7 +326,7 @@ struct LossBasedBweV2::Impl
 LossBasedBweV2::Impl::Impl(Config config)
     : config_(config.enabled ? std::optional<Config>(std::move(config)) : std::nullopt) {
   if (!config_.has_value()) {
-    UAV_LOG_DEBUG << "[WebRTC][LossBasedBweV2] " << "The configuration does not specify that the "
+    UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][LossBasedBweV2] " << "The configuration does not specify that the "
                            "estimator should be enabled, disabling it.";
     return;
   }
@@ -391,6 +391,7 @@ LossBasedBweV2::Impl::Result LossBasedBweV2::Impl::GetLossBasedResult() const {
 
 void LossBasedBweV2::Impl::SetAcknowledgedBitrate(DataRate acknowledged_bitrate) {
   if (IsValid(acknowledged_bitrate)) {
+    UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][LossBasedBweV2][" << this << "] acknowledged_bps=" << ToString(acknowledged_bitrate);
     acknowledged_bitrate_ = acknowledged_bitrate;
     CalculateInstantLowerBound();
   } else {
@@ -401,6 +402,7 @@ void LossBasedBweV2::Impl::SetAcknowledgedBitrate(DataRate acknowledged_bitrate)
 
 void LossBasedBweV2::Impl::SetBandwidthEstimate(DataRate bandwidth_estimate) {
   if (IsValid(bandwidth_estimate)) {
+    UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][LossBasedBweV2][" << this << "] set bandwidth_bps=" << ToString(bandwidth_estimate);
     current_best_estimate_.loss_limited_bandwidth = bandwidth_estimate;
     loss_based_result_ = {bandwidth_estimate, LossBasedState::kDelayBasedEstimate};
   } else {
@@ -411,6 +413,8 @@ void LossBasedBweV2::Impl::SetBandwidthEstimate(DataRate bandwidth_estimate) {
 
 void LossBasedBweV2::Impl::SetMinMaxBitrate(DataRate min_bitrate,
                                       DataRate max_bitrate) {
+  UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][LossBasedBweV2][" << this << "] set min_bps=" << ToString(min_bitrate)
+      << " max_bps=" << ToString(max_bitrate);
   if (IsValid(min_bitrate)) {
     min_bitrate_ = min_bitrate;
     CalculateInstantLowerBound();
@@ -439,7 +443,7 @@ void LossBasedBweV2::Impl::UpdateBandwidthEstimate(
   }
 
   if (packet_results.empty()) {
-    UAV_LOG_DEBUG << "[WebRTC][LossBasedBweV2] "
+    UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][LossBasedBweV2] "
         << "The estimate cannot be updated without any loss statistics.";
     return;
   }
@@ -464,6 +468,8 @@ void LossBasedBweV2::Impl::UpdateBandwidthEstimate(
     NewtonsMethodUpdate(candidate);
 
     const double candidate_objective = GetObjective(candidate);
+    UAV_LOG_IF(LogLevel::TRACE, LogManager::getInstance().shouldLog(LogLevel::TRACE)) << "[WebRTC][LossBasedBweV2][" << this << "] candidate_bps=" << ToString(candidate.loss_limited_bandwidth)
+        << " inherent_loss=" << candidate.inherent_loss << " objective=" << candidate_objective;
     if (candidate_objective > objective_max ||
         (candidate_objective == objective_max &&
          candidate.loss_limited_bandwidth >
@@ -570,6 +576,8 @@ void LossBasedBweV2::Impl::UpdateBandwidthEstimate(
     // HOLD is to not immediately ramp up BWE to a rate that may cause loss.
     loss_based_result_.bandwidth_estimate =
         std::min(last_hold_info_.rate, bounded_bandwidth_estimate);
+    UAV_LOG_IF(LogLevel::TRACE, LogManager::getInstance().shouldLog(LogLevel::TRACE)) << "[WebRTC][LossBasedBweV2][" << this << "] holding estimate_bps=" << ToString(loss_based_result_.bandwidth_estimate)
+        << " hold_rate_bps=" << ToString(last_hold_info_.rate) << " average_loss=" << average_reported_loss_ratio_;
     return;
   }
 
@@ -1178,6 +1186,8 @@ void LossBasedBweV2::Impl::CalculateInstantUpperBound() {
   }
 
   cached_instant_upper_bound_ = instant_limit;
+  UAV_LOG_IF(LogLevel::TRACE, LogManager::getInstance().shouldLog(LogLevel::TRACE)) << "[WebRTC][LossBasedBweV2][" << this << "] upper_bound_bps=" << ToString(instant_limit)
+      << " average_loss=" << average_reported_loss_ratio_;
 }
 
 DataRate LossBasedBweV2::Impl::GetInstantLowerBound() const {
@@ -1197,6 +1207,7 @@ void LossBasedBweV2::Impl::CalculateInstantLowerBound() {
     instance_lower_bound = std::max(instance_lower_bound, min_bitrate_);
   }
   cached_instant_lower_bound_ = instance_lower_bound;
+  UAV_LOG_IF(LogLevel::TRACE, LogManager::getInstance().shouldLog(LogLevel::TRACE)) << "[WebRTC][LossBasedBweV2][" << this << "] lower_bound_bps=" << ToString(instance_lower_bound);
 }
 
 void LossBasedBweV2::Impl::CalculateTemporalWeights() {
@@ -1256,6 +1267,8 @@ bool LossBasedBweV2::Impl::PushBackObservation(
   // for a long time, then all the packets we received are too old.
   if (observation_duration <= TimeDelta::Zero() ||
       observation_duration < TimeDelta::Micros(config_->observation_duration_lower_bound.count())) {
+    UAV_LOG_IF(LogLevel::TRACE, LogManager::getInstance().shouldLog(LogLevel::TRACE)) << "[WebRTC][LossBasedBweV2][" << this << "] accumulating observation duration_us=" << observation_duration.us()
+        << " required_us=" << config_->observation_duration_lower_bound.count() << " packets=" << partial_observation_.num_packets;
     return false;
   }
 
@@ -1279,6 +1292,11 @@ bool LossBasedBweV2::Impl::PushBackObservation(
   partial_observation_ = PartialObservation();
   UpdateAverageReportedLossRatio();
   CalculateInstantUpperBound();
+  UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][LossBasedBweV2][" << this << "] observation=" << observation.id
+      << " duration_us=" << observation_duration.us() << " packets=" << observation.num_packets
+      << " lost_packets=" << observation.num_lost_packets << " bytes=" << observation.size.bytes()
+      << " lost_bytes=" << observation.lost_size.bytes() << " sending_bps=" << ToString(observation.sending_rate)
+      << " average_loss=" << average_reported_loss_ratio_;
   return true;
 }
 
@@ -1338,7 +1356,11 @@ void LossBasedBweV2::SetMinMaxBitrate(std::uint64_t min, std::optional<std::uint
 {
     const auto minimum = checkedRate(min);
     const auto maximum = max ? checkedRate(*max) : DataRate::PlusInfinity();
-    if (maximum < minimum) throw std::invalid_argument("loss BWE minimum exceeds maximum bitrate");
+    if (maximum < minimum)
+    {
+        UAV_LOG_WARN << "[WebRTC][LossBasedBweV2] minimum_bps=" << min << " exceeds maximum_bps=" << *max;
+        throw std::invalid_argument("loss BWE minimum exceeds maximum bitrate");
+    }
     impl_->SetMinMaxBitrate(minimum, maximum);
     // An explicit nullopt removes the configured maximum in this C++ API.
 }
@@ -1355,7 +1377,10 @@ void LossBasedBweV2::UpdateBandwidthEstimate(const std::vector<PacketResult>& pa
     auto remaining_bytes = static_cast<std::uint64_t>(kMaxFinite - impl_->partial_observation_.size.bytes());
     if (packets.size() > static_cast<std::uint64_t>(kMaxFinite - impl_->partial_observation_.num_packets) ||
         impl_->num_observations_ == kMaxFinite)
+    {
+        UAV_LOG_WARN << "[WebRTC][LossBasedBweV2] feedback record counter overflow packets=" << packets.size();
         throw std::overflow_error("too many loss BWE feedback records");
+    }
     std::vector<ModelPacket> converted;
     converted.reserve(packets.size());
     for (const auto& packet : packets)
@@ -1363,9 +1388,16 @@ void LossBasedBweV2::UpdateBandwidthEstimate(const std::vector<PacketResult>& pa
         if (!packet.sent_packet.send_time || packet.sent_packet.send_time->time_since_epoch() < TransportTime::duration::zero() ||
             (packet.receive_time && packet.receive_time->time_since_epoch() < TransportTime::duration::zero()) ||
             packet.sent_packet.sequence_number < 0)
+        {
+            UAV_LOG_WARN << "[WebRTC][LossBasedBweV2] invalid send history or timestamp seq=" << packet.sent_packet.sequence_number;
             throw std::invalid_argument("loss BWE requires valid send history and packet timestamps");
+        }
         if (packet.sent_packet.size > remaining_bytes)
+        {
+            UAV_LOG_WARN << "[WebRTC][LossBasedBweV2] observation byte overflow packet_bytes=" << packet.sent_packet.size
+                << " remaining_bytes=" << remaining_bytes;
             throw std::overflow_error("loss BWE observation byte count exceeds int64 range");
+        }
         remaining_bytes -= packet.sent_packet.size;
         const auto send_us = std::chrono::duration_cast<std::chrono::microseconds>(packet.sent_packet.send_time->time_since_epoch()).count();
         converted.push_back({{Timestamp::Micros(send_us), DataSize::Bytes(static_cast<std::int64_t>(packet.sent_packet.size)),
@@ -1374,11 +1406,15 @@ void LossBasedBweV2::UpdateBandwidthEstimate(const std::vector<PacketResult>& pa
     const auto previous = impl_->loss_based_result_;
     impl_->UpdateBandwidthEstimate(converted, delay, in_alr);
     const auto& result = impl_->loss_based_result_;
-    if (previous.state != result.state || result.bandwidth_estimate < previous.bandwidth_estimate)
-        UAV_LOG_DEBUG << "[WebRTC][LossBasedBweV2] state=" << static_cast<int>(result.state)
+    if (previous.state != result.state || result.bandwidth_estimate != previous.bandwidth_estimate)
+        UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][LossBasedBweV2] state=" << static_cast<int>(result.state)
+            << " previous_state=" << static_cast<int>(previous.state) << " previous_bps=" << ToString(previous.bandwidth_estimate)
             << " estimate_bps=" << ToString(result.bandwidth_estimate)
             << " average_loss=" << impl_->average_reported_loss_ratio_
             << " inherent_loss=" << impl_->current_best_estimate_.inherent_loss;
+    UAV_LOG_IF(LogLevel::TRACE, LogManager::getInstance().shouldLog(LogLevel::TRACE)) << "[WebRTC][LossBasedBweV2][" << this << "] feedback packets=" << packets.size()
+        << " delay_estimate_available=" << delay_bps.has_value() << " delay_bps=" << delay_bps.value_or(0)
+        << " in_alr=" << in_alr << " ready=" << impl_->IsReady() << " observations=" << impl_->num_observations_;
 }
 LossBasedBweV2::Stats LossBasedBweV2::Snapshot() const
 {

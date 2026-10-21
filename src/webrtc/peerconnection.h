@@ -107,6 +107,8 @@ public:
         std::function<void(TwccFeedbackEvent)> onTwccFeedback;
         std::function<void(ErrorCode, std::string)> onError;
         std::function<void(TransportPacketsFeedback)> onTransportFeedback;
+        std::function<void(CongestionControlEvent)> onTargetTransferRate;
+        std::function<void(RtcpRembEvent)> onRemoteBitrateReport;
     };
 
     explicit PeerConnection(boost::asio::io_context& io);
@@ -134,9 +136,12 @@ public:
     void asyncSendRtp(Bytes plaintext, SendHandler done = {}); // 转发下层 transport 加密；需 dtls.enableSrtp
     void asyncSendRtcp(Bytes plaintext, SendHandler done = {});
     void requestPli(std::uint32_t mediaSsrc, Completion done = {}); // 转发到下层；需协商 nack pli
-    void setPacingRate(std::uint64_t rateBps, Completion done = {}); // 转发到下层 pacer；0 暂停 RTP
+    void setPacingRate(std::uint64_t rateBps, Completion done = {}); // 手动模式转发到下层 pacer；GCC 活动时不可直接改速率
     void setPacingRates(std::uint64_t rateBps, std::uint64_t paddingRateBps, Completion done = {});
     void setPacingPaused(bool paused, Completion done = {});
+    void setBitrateConstraints(TargetRateConstraints constraints, Completion done = {});
+    void setStreamsConfig(StreamsConfig streams, Completion done = {});
+    void setNetworkStateEstimate(NetworkStateEstimate estimate, Completion done = {});
     void close(Completion done = {}); // 幂等；关闭 DataChannel、DTLS（含 SRTP/SRTCP）、ICE 并等待发送回调
 
 private:

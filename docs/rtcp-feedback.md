@@ -60,7 +60,7 @@ Offer/Answer 的共同能力决定是否启用 NACK、PLI、FIR、transport-cc�
 - 未协商 `rtcp-rsize` 时，反馈前附加 RR + SDES；周期报告始终为 compound RTCP。RTCP 经 SRTCP 加密，反馈只在认证、端点、component、generation 校验后处理。完整 compound 先校验再处理，畸形尾包不会触发前面的 NACK/PLI。
 - ICE restart 清除报告、缺口、重传缓存、TWCC 历史和计数，重新建立 DTLS 密钥后恢复定时器；失败/关闭会停止自动输出。统计中的 sent* / retransmissions 表示引擎生成或安排的包数，UDP 输出失败会用现有 log 库记录，crypto 统计可查看实际保护次数。
 
-同一个 BUNDLE transport 的相同 PT 必须有相同的媒体种类、时钟、方向和反馈能力，同一方向的 TWCC 扩展 ID 必须一致；冲突协商返回 `operation_not_supported`。这些约束避免未实现 MID/SSRC 路由时把不同媒体的反馈能力误用。当前生成/匹配 TWCC 并输出反馈数据，RTP/重传已接入 pacer；尚未实现 GCC、自动编码码率调整或 RTX 封装。原密文重传受接收端 SRTP replay window 约束，长延迟重传可在后续增加 RTX。
+同一个 BUNDLE transport 的相同 PT 必须有相同的媒体种类、时钟、方向和反馈能力，同一方向的 TWCC 扩展 ID 必须一致；冲突协商返回 `operation_not_supported`。这些约束避免未实现 MID/SSRC 路由时把不同媒体的反馈能力误用。TWCC 原始反馈和实际发送记录已接入下层 [GCC](goog-cc-network-control.md)，同时保留用户回调。PSFB FMT=15 的 REMB 支持解析/构造，匹配本地发送 SSRC 后作为码率上限并通过 `onRemoteBitrateReport` 通知用户；SR/RR 的 RTT/增量丢包也进入 GCC。编码端消费目标回调执行调速；RTX 封装尚待实现。原密文重传受接收端 SRTP replay window 约束，长延迟重传可在后续增加 RTX。
 
 ## 验证
 

@@ -613,6 +613,13 @@ struct PeerConnection::Impl : std::enable_shared_from_this<PeerConnection::Impl>
         dh.onKeyFrameRequest = bridgeFeedback(&Callbacks::onKeyFrameRequest);
         dh.onTwccFeedback = bridgeFeedback(&Callbacks::onTwccFeedback);
         dh.onTransportFeedback = bridgeFeedback(&Callbacks::onTransportFeedback);
+        dh.onRemoteBitrateReport = bridgeFeedback(&Callbacks::onRemoteBitrateReport);
+        dh.onTargetTransferRate = [weak](auto event) {
+            if (auto self = weak.lock()) net::post(self->strand, [self, event = std::move(event)]() mutable {
+                if (self->closing || event.generation != self->ice->snapshot().generation) return;
+                if (self->callbacks.onTargetTransferRate) self->callbacks.onTargetTransferRate(std::move(event));
+            });
+        };
         auto nextDtls = std::make_unique<DtlsTransport>(io, [weak](Bytes bytes, SendHandler done) {
             if (auto self = weak.lock()) self->ice->asyncSend(std::move(bytes), 1, std::move(done));
             else if (done) done(net::error::operation_aborted, 0);
@@ -1451,6 +1458,33 @@ void PeerConnection::setPacingPaused(bool paused, Completion done)
     net::post(self->strand, [self, paused, done = std::move(done)]() mutable {
         if (self->closing) { complete(done, net::error::operation_aborted); return; }
         self->dtls->setPacingPaused(paused, [self, done = std::move(done)](ErrorCode ec) {
+            net::post(self->strand, [self, done, ec] { self->publish(); complete(done, ec); });
+        });
+    });
+}
+void PeerConnection::setBitrateConstraints(TargetRateConstraints constraints, Completion done)
+{
+    const auto self = impl_; net::post(self->strand, [self, constraints, done = std::move(done)]() mutable {
+        if (self->closing) { complete(done, net::error::operation_aborted); return; }
+        self->dtls->setBitrateConstraints(constraints, [self, done = std::move(done)](ErrorCode ec) {
+            net::post(self->strand, [self, done, ec] { self->publish(); complete(done, ec); });
+        });
+    });
+}
+void PeerConnection::setStreamsConfig(StreamsConfig streams, Completion done)
+{
+    const auto self = impl_; net::post(self->strand, [self, streams, done = std::move(done)]() mutable {
+        if (self->closing) { complete(done, net::error::operation_aborted); return; }
+        self->dtls->setStreamsConfig(streams, [self, done = std::move(done)](ErrorCode ec) {
+            net::post(self->strand, [self, done, ec] { self->publish(); complete(done, ec); });
+        });
+    });
+}
+void PeerConnection::setNetworkStateEstimate(NetworkStateEstimate estimate, Completion done)
+{
+    const auto self = impl_; net::post(self->strand, [self, estimate, done = std::move(done)]() mutable {
+        if (self->closing) { complete(done, net::error::operation_aborted); return; }
+        self->dtls->setNetworkStateEstimate(estimate, [self, done = std::move(done)](ErrorCode ec) {
             net::post(self->strand, [self, done, ec] { self->publish(); complete(done, ec); });
         });
     });

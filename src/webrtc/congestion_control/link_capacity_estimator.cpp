@@ -38,14 +38,18 @@ std::uint64_t LinkCapacityEstimator::LowerBound() const
 }
 void LinkCapacityEstimator::Reset()
 {
-    if (estimate_kbps_) UAV_LOG_DEBUG << "[WebRTC][LinkCapacityEstimator] reset estimate_bps=" << *estimate();
+    if (estimate_kbps_) UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][LinkCapacityEstimator] reset estimate_bps=" << *estimate();
     estimate_kbps_.reset();
 }
-void LinkCapacityEstimator::OnOveruseDetected(std::uint64_t acknowledged_rate_bps) { Update(acknowledged_rate_bps, 0.05); }
+void LinkCapacityEstimator::OnOveruseDetected(std::uint64_t acknowledged_rate_bps)
+{
+    UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][LinkCapacityEstimator][" << this << "] overuse acknowledged_bps=" << acknowledged_rate_bps;
+    Update(acknowledged_rate_bps, 0.05);
+}
 void LinkCapacityEstimator::OnProbeRate(std::uint64_t probe_rate_bps)
 {
     Update(probe_rate_bps, 0.5);
-    UAV_LOG_DEBUG << "[WebRTC][LinkCapacityEstimator] probe_bps=" << probe_rate_bps << " estimate_bps=" << *estimate();
+    UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][LinkCapacityEstimator] probe_bps=" << probe_rate_bps << " estimate_bps=" << *estimate();
 }
 void LinkCapacityEstimator::Update(std::uint64_t capacity_sample_bps, double alpha)
 {
@@ -61,7 +65,10 @@ void LinkCapacityEstimator::Update(std::uint64_t capacity_sample_bps, double alp
     deviation_kbps_ = (1 - alpha) * deviation_kbps_ + alpha * error_kbps * error_kbps / norm;
     // The original clamp's float lower bound is intentionally retained.
     deviation_kbps_ = std::clamp(deviation_kbps_, static_cast<double>(0.4f), static_cast<double>(2.5f));
-    if (!initialized) UAV_LOG_DEBUG << "[WebRTC][LinkCapacityEstimator] initialized estimate_bps=" << *estimate();
+    if (!initialized) UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][LinkCapacityEstimator] initialized estimate_bps=" << *estimate();
+    UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][LinkCapacityEstimator][" << this << "] sample_bps=" << capacity_sample_bps
+        << " alpha=" << alpha << " estimate_bps=" << *estimate() << " lower_bps=" << LowerBound()
+        << " upper_bps=" << *UpperBound() << " normalized_variance_kbps=" << deviation_kbps_;
 }
 bool LinkCapacityEstimator::has_estimate() const { return estimate_kbps_.has_value(); }
 std::optional<std::uint64_t> LinkCapacityEstimator::estimate() const

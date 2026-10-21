@@ -42,7 +42,7 @@ public:
     {
         std::uint64_t generation{0}, rateBps{0}, adjustedRateBps{0}, paddingRateBps{0};
         std::int64_t mediaBudgetBytes{0}, paddingBudgetBytes{0}; // negative means outstanding byte debt
-        bool paused{false};
+        bool paused{false}, congested{false};
         std::size_t queuedPackets{0}, queuedBytes{0}, streams{0}; // queuedBytes includes transport overhead
         std::chrono::microseconds oldestWait{0};
         std::chrono::microseconds averageQueueTime{0}; // excludes explicit pause and rate=0
@@ -60,10 +60,13 @@ public:
     bool setRate(std::uint64_t rateBps, Time now);
     bool setRates(std::uint64_t rateBps, std::uint64_t paddingRateBps, Time now);
     void setPaused(bool paused, Time now);
+    void setCongested(bool congested); // Blocks media/probes while RTCP continues outside this scheduler.
+    void accountProbeBytes(std::size_t bytes); // Generated probe datagrams bypass the queue but consume both budgets.
     Admission enqueue(Packet packet, Time now);
     // Caller expires queued requests before release, completing them with timed_out.
     std::vector<Packet> expire(Time now);
-    std::optional<Packet> pop(Time now);
+    std::optional<Packet> remove(std::uint64_t id, Time now); // Cancel queued generated padding without disturbing media.
+    std::optional<Packet> pop(Time now, bool probing = false); // Probes bypass rate/padding budgets, retain pause/congestion guards.
     std::optional<Time> nextWakeup(Time now); // includes expiry deadlines while paused/rate=0
     Snapshot snapshot(Time now) const;
     std::vector<Packet> clear(Time now); // cancellation; retains counters/settings

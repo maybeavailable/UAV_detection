@@ -23,7 +23,11 @@ InterArrivalDelta::InterArrivalDelta(Delta send_time_group_length)
     : send_time_group_length_(send_time_group_length)
 {
     if (send_time_group_length < Delta::zero())
+    {
+        UAV_LOG_WARN << "[WebRTC][InterArrivalDelta] invalid group_length_us=" << send_time_group_length.count();
         throw std::invalid_argument("negative inter-arrival send time group length");
+    }
+    UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][InterArrivalDelta][" << this << "] initialized group_length_us=" << send_time_group_length_.count();
 }
 
 bool InterArrivalDelta::ComputeDeltas(Time send, Time arrival, Time system, std::size_t packet_size,
@@ -31,7 +35,10 @@ bool InterArrivalDelta::ComputeDeltas(Time send, Time arrival, Time system, std:
 {
     constexpr auto max_size = static_cast<std::size_t>(std::numeric_limits<int>::max());
     if (!send_time_delta || !arrival_time_delta || !packet_size_delta || packet_size > max_size)
+    {
+        UAV_LOG_WARN << "[WebRTC][InterArrivalDelta][" << this << "] invalid output pointer or packet bytes=" << packet_size;
         throw std::invalid_argument("invalid inter-arrival output pointer or packet size");
+    }
 
     // Subtract epoch microseconds instead of time_points: even the difference
     // between steady_clock's minimum and maximum nanosecond times stays safe.
@@ -50,6 +57,8 @@ bool InterArrivalDelta::ComputeDeltas(Time send, Time arrival, Time system, std:
     else if (current.first_send_time > send_time)
     {
         // Ignore older packets without modifying either group.
+        UAV_LOG_IF(LogLevel::TRACE, LogManager::getInstance().shouldLog(LogLevel::TRACE)) << "[WebRTC][InterArrivalDelta][" << this << "] ignored old send_us=" << send_time.count()
+            << " group_first_send_us=" << current.first_send_time.count();
         return false;
     }
     else if (NewTimestampGroup(arrival_time, send_time))
@@ -92,12 +101,19 @@ bool InterArrivalDelta::ComputeDeltas(Time send, Time arrival, Time system, std:
     else
     {
         if (packet_size > max_size - current.size)
+        {
+            UAV_LOG_WARN << "[WebRTC][InterArrivalDelta][" << this << "] group byte count overflow group_bytes="
+                << current.size << " packet_bytes=" << packet_size;
             throw std::overflow_error("inter-arrival group size exceeds int range");
+        }
         current.send_time = std::max(current.send_time, send_time);
     }
     current.size += packet_size;
     current.complete_time = arrival_time;
     current.last_system_time = system_time;
+    if (calculated_deltas)
+        UAV_LOG_IF(LogLevel::TRACE, LogManager::getInstance().shouldLog(LogLevel::TRACE)) << "[WebRTC][InterArrivalDelta][" << this << "] send_delta_us=" << send_time_delta->count()
+            << " arrival_delta_us=" << arrival_time_delta->count() << " size_delta_bytes=" << *packet_size_delta;
     return calculated_deltas;
 }
 
@@ -118,6 +134,7 @@ bool InterArrivalDelta::BelongsToBurst(Delta arrival_time, Delta send_time) cons
 }
 void InterArrivalDelta::Reset()
 {
+    UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][InterArrivalDelta][" << this << "] reset reordered_groups=" << num_consecutive_reordered_packets_;
     num_consecutive_reordered_packets_ = 0;
     current_timestamp_group_ = SendTimeGroup{};
     prev_timestamp_group_ = SendTimeGroup{};

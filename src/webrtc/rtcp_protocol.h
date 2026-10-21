@@ -46,7 +46,13 @@ struct RtcpTwcc
     // Unit 250 us; small unsigned 8-bit or signed 16-bit on the wire.
     std::vector<std::optional<std::int32_t>> deltas;
 };
-using RtcpMessage = std::variant<RtcpReport, RtcpNack, RtcpKeyFrameRequest, RtcpTwcc>;
+struct RtcpRemb
+{
+    std::uint32_t senderSsrc{0};
+    std::uint64_t bitrateBps{0};
+    std::vector<std::uint32_t> ssrcs;
+};
+using RtcpMessage = std::variant<RtcpReport, RtcpNack, RtcpKeyFrameRequest, RtcpTwcc, RtcpRemb>;
 
 // Compound / reduced-size RTCP. Unknown packet types/FMT are skipped; malformed input
 // returns false and leaves out unchanged. Allocation bounds include <=8192 TWCC statuses.
@@ -56,6 +62,7 @@ RtcpBytes buildRtcpSdes(std::uint32_t ssrc, const std::string& cname);
 RtcpBytes buildRtcpNack(const RtcpNack& nack);
 RtcpBytes buildRtcpKeyFrameRequest(const RtcpKeyFrameRequest& request);
 RtcpBytes buildRtcpTwcc(const RtcpTwcc& feedback);
+RtcpBytes buildRtcpRemb(const RtcpRemb& feedback);
 
 // RFC 8285 one-byte / two-byte extensions. Preserve other extensions, CSRC, payload and padding.
 std::optional<std::uint16_t> rtpTransportSequence(const RtcpBytes& packet, std::uint8_t extensionId);

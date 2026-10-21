@@ -65,7 +65,7 @@ struct RtcpSession::Impl
         std::set<std::int64_t> seen;
         std::map<std::int64_t, Missing> missing;
         Time arrival{}, srAt{}, lastPli{};
-        double jitter{0}; bool initialized{false}, hasPli{false};
+        double jitter{0}; bool initialized{false}, hasPli{false}, hasMediaPayload{false};
     };
     struct Sender
     {
@@ -155,15 +155,27 @@ struct RtcpSession::Impl
         if (assignSequence) ++nextTransport;
         return true;
     }
-    std::optional<std::int64_t> sending(const RtcpBytes& bytes, std::size_t wireSize, Time created, Time now, std::size_t overhead)
+    void untracked(std::size_t bytes, Time now, bool audio = false)
+    {
+        (void)transport.ProcessSentPacket({-1, now, {false, true, bytes}});
+        if (callbacks.onSentPacket)
+        {
+            SentPacket sent; sent.send_time = now; sent.size = bytes; sent.audio = audio; sent.data_in_flight = transport.GetOutstandingData();
+            callbacks.onSentPacket(sent);
+        }
+    }
+    std::optional<std::int64_t> sending(const RtcpBytes& bytes, std::size_t wireSize, Time created, Time now, std::size_t overhead,
+        const PacedPacketInfo& pacing = {})
     {
         if (!config.enabled) return std::nullopt;
         RtpPacketParser r(bytes.data(), bytes.size()); if (!r.valid()) return std::nullopt;
         const auto* m = find(r.payloadType(), true);
-        if (!m || !m->transportCc || !m->sendTwccExtension) return std::nullopt;
+        if (!m) return std::nullopt;
+        if (!m->transportCc || !m->sendTwccExtension) { untracked(wireSize + overhead, now, m->audio); return std::nullopt; }
         const auto seq = rtpTransportSequence(bytes, *m->sendTwccExtension); if (!seq) return std::nullopt;
-        if (!transport.AddPacket({*seq, wireSize, r.ssrc(), r.sequenceNumber(), m->audio, false}, {}, overhead, created)) return std::nullopt;
+        if (!transport.AddPacket({*seq, wireSize, r.ssrc(), r.sequenceNumber(), m->audio, false}, pacing, overhead, created)) return std::nullopt;
         const auto sent = transport.ProcessSentPacket({*seq, now, {true, true, wireSize}});
+        if (sent && callbacks.onSentPacket) callbacks.onSentPacket(*sent);
         return sent ? std::optional<std::int64_t>(sent->sequence_number) : std::nullopt;
     }
     void sent(const RtcpBytes& bytes, RtcpBytes wire, Time now, bool recordTransport, std::optional<std::int64_t> transportSequence)
@@ -175,7 +187,7 @@ struct RtcpSession::Impl
         if (!senders.count(r.ssrc()) && senders.size() >= config.maxStreams) return;
         auto& s = senders[r.ssrc()]; s.pt = r.payloadType(); s.rate = m->clockRate; s.timestamp = r.timestamp(); s.lastSend = now;
         ++s.packets; s.octets += r.payloadSize(); activity(now);
-        if (m->nack && wire.size() <= config.maxCachedBytes)
+        if (m->nack && r.payloadSize() && wire.size() <= config.maxCachedBytes)
         {
             stats.cachedBytes += wire.size(); cache.push_back({r.ssrc(), r.sequenceNumber(), std::move(wire), now, {}, 0, transportSequence});
         }
@@ -214,11 +226,12 @@ struct RtcpSession::Impl
             else { s.badSequence = static_cast<std::uint16_t>(r.sequenceNumber() + 1); return; }
         }
         if (!s.initialized) { s.base = seq; s.highest = seq; s.initialized = true; }
+        s.hasMediaPayload = s.hasMediaPayload || r.payloadSize() != 0;
         if (seq < s.base || seq < s.highest - 4096 || !s.seen.insert(seq).second) return;
         while (!s.seen.empty() && *s.seen.begin() < std::max(s.base, s.highest - 4096)) s.seen.erase(s.seen.begin());
         if (seq > s.highest)
         {
-            if (m->nack)
+            if (m->nack && s.hasMediaPayload)
                 for (auto gap = std::max(s.highest + 1, seq - static_cast<std::int64_t>(config.maxMissing)); gap < seq; ++gap)
                 {
                     if (s.missing.size() >= config.maxMissing) s.missing.erase(s.missing.begin());
@@ -333,6 +346,11 @@ struct RtcpSession::Impl
             else if (const auto* n = std::get_if<RtcpNack>(&message)) nack(*n, now);
             else if (const auto* k = std::get_if<RtcpKeyFrameRequest>(&message)) keyFrame(*k, now);
             else if (const auto* t = std::get_if<RtcpTwcc>(&message)) twccFeedback(*t, now);
+            else if (const auto* remb = std::get_if<RtcpRemb>(&message))
+            {
+                const bool ours = std::any_of(remb->ssrcs.begin(), remb->ssrcs.end(), [&](auto ssrc) { return senders.count(ssrc) != 0; });
+                if (ours && callbacks.onRemb) callbacks.onRemb({stats.generation, *remb});
+            }
         }
         return true;
     }
@@ -451,13 +469,16 @@ struct RtcpSession::Impl
     }
 };
 RtcpSession::RtcpSession(Config config, Callbacks callbacks) : impl_(std::make_unique<Impl>(std::move(config), std::move(callbacks))) {}
+RtcpSession::RtcpSession(Config config) : RtcpSession(std::move(config), Callbacks{}) {}
 RtcpSession::~RtcpSession() = default;
 bool RtcpSession::configure(RtcpParameters p) { return impl_->configure(std::move(p)); }
 bool RtcpSession::prepareRtp(RtcpBytes& b) { return impl_->prepare(b); }
 bool RtcpSession::reserveRtpExtensions(RtcpBytes& b) { return impl_->prepare(b, false); }
-std::optional<std::int64_t> RtcpSession::sendingRtp(const RtcpBytes& b, std::size_t size, Time created, Time now, std::size_t overhead)
-{ return impl_->sending(b, size, created, now, overhead); }
-void RtcpSession::retransmittedRtp(std::int64_t seq, Time now) { impl_->transport.MarkRetransmitted(seq, now); }
+std::optional<std::int64_t> RtcpSession::sendingRtp(const RtcpBytes& b, std::size_t size, Time created, Time now, std::size_t overhead, const PacedPacketInfo& pacing)
+{ return impl_->sending(b, size, created, now, overhead, pacing); }
+void RtcpSession::retransmittedRtp(std::int64_t seq, Time now, std::size_t size, std::size_t overhead)
+{ impl_->transport.MarkRetransmitted(seq, now); if (size) impl_->untracked(size + overhead, now); }
+std::size_t RtcpSession::outstandingData() const { return impl_->transport.GetOutstandingData(); }
 void RtcpSession::failedRtp(std::int64_t seq) { impl_->transport.RemovePacket(seq); }
 void RtcpSession::sentRtp(const RtcpBytes& b, RtcpBytes wire, Time now, bool record, std::optional<std::int64_t> sequence)
 { impl_->sent(b, std::move(wire), now, record, sequence); }

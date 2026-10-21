@@ -17,8 +17,10 @@ using TransportTime = std::chrono::steady_clock::time_point;
 // for the pinned upstream revision, type adaptations and BSD license.
 struct PacedPacketInfo
 {
-    int probe_cluster_id{-1}, probe_cluster_min_probes{-1}, probe_cluster_min_bytes{-1};
+    static constexpr int kNotAProbe = -1;
+    int probe_cluster_id{kNotAProbe}, probe_cluster_min_probes{-1}, probe_cluster_min_bytes{-1};
     std::uint64_t send_bitrate_bps{0};
+    std::uint64_t probe_cluster_bytes_sent{0};
 };
 struct SentPacket
 {

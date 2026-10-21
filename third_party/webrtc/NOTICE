@@ -7,10 +7,25 @@ src/webrtc/congestion_control/trendline_estimator.h/.cpp and its detector interf
 src/webrtc/congestion_control/link_capacity_estimator.h/.cpp and
 src/webrtc/congestion_control/aimd_rate_control.h/.cpp and
 src/webrtc/congestion_control/delay_based_bwe.h/.cpp and network_state_estimate.h and
-src/webrtc/congestion_control/loss_based_bwe_v2.h/.cpp
+src/webrtc/congestion_control/loss_based_bwe_v2.h/.cpp and
+src/webrtc/congestion_control/probe_controller.h/.cpp and probe_cluster_config.h and
+src/webrtc/congestion_control/probe_bitrate_estimator.h/.cpp and
+src/webrtc/congestion_control/bitrate_prober.h/.cpp and
+src/webrtc/congestion_control/network_control.h/.cpp and
+src/webrtc/congestion_control/send_side_bandwidth_estimation.h/.cpp and
+src/webrtc/congestion_control/congestion_window_pushback_controller.h/.cpp and
+src/webrtc/congestion_control/goog_cc_network_control.h/.cpp
 are adapted from The WebRTC project.
 Regression scenarios in tests/webrtc/loss_based_bwe_v2_test.cpp are also adapted
 from the upstream loss_based_bwe_v2_test.cc.
+Regression scenarios in tests/webrtc/probe_controller_test.cpp are also adapted
+from the upstream probe_controller_unittest.cc.
+Regression scenarios in tests/webrtc/probe_bitrate_estimator_test.cpp are also
+adapted from the upstream probe_bitrate_estimator_unittest.cc.
+Regression scenarios in tests/webrtc/goog_cc_network_control_test.cpp are also
+adapted from the upstream goog_cc_network_control_unittest.cc.
+Probe scheduling scenarios in tests/webrtc/gcc_transport_controller_test.cpp
+are adapted from the upstream bitrate_prober_unittest.cc.
 
 Upstream revision: 602d5fc23caaca7728ad5f3f0e68b92274d1a38a
 
@@ -19,6 +34,16 @@ Original files:
   modules/congestion_controller/rtp/transport_feedback_adapter.cc
   api/transport/network_types.h
   api/transport/network_types.cc
+  api/transport/network_control.h
+  rtc_base/experiments/rate_control_settings.h
+  rtc_base/experiments/rate_control_settings.cc
+  modules/congestion_controller/goog_cc/goog_cc_network_control.h
+  modules/congestion_controller/goog_cc/goog_cc_network_control.cc
+  modules/congestion_controller/goog_cc/goog_cc_network_control_unittest.cc
+  modules/congestion_controller/goog_cc/send_side_bandwidth_estimation.h
+  modules/congestion_controller/goog_cc/send_side_bandwidth_estimation.cc
+  modules/congestion_controller/goog_cc/congestion_window_pushback_controller.h
+  modules/congestion_controller/goog_cc/congestion_window_pushback_controller.cc
   modules/congestion_controller/goog_cc/bitrate_estimator.h
   modules/congestion_controller/goog_cc/bitrate_estimator.cc
   modules/congestion_controller/goog_cc/acknowledged_bitrate_estimator.h
@@ -29,6 +54,9 @@ Original files:
   modules/congestion_controller/goog_cc/alr_detector.cc
   modules/pacing/interval_budget.h
   modules/pacing/interval_budget.cc
+  modules/pacing/bitrate_prober.h
+  modules/pacing/bitrate_prober.cc
+  modules/pacing/bitrate_prober_unittest.cc
   modules/congestion_controller/goog_cc/trendline_estimator.h
   modules/congestion_controller/goog_cc/trendline_estimator.cc
   modules/congestion_controller/goog_cc/delay_increase_detector_interface.h
@@ -44,6 +72,12 @@ Original files:
   modules/congestion_controller/goog_cc/loss_based_bwe_v2.h
   modules/congestion_controller/goog_cc/loss_based_bwe_v2.cc
   modules/congestion_controller/goog_cc/loss_based_bwe_v2_test.cc
+  modules/congestion_controller/goog_cc/probe_controller.h
+  modules/congestion_controller/goog_cc/probe_controller.cc
+  modules/congestion_controller/goog_cc/probe_controller_unittest.cc
+  modules/congestion_controller/goog_cc/probe_bitrate_estimator.h
+  modules/congestion_controller/goog_cc/probe_bitrate_estimator.cc
+  modules/congestion_controller/goog_cc/probe_bitrate_estimator_unittest.cc
   api/units/data_rate.h
   api/units/data_size.h
   api/units/time_delta.h
@@ -56,4 +90,5 @@ The upstream BSD license and patent grant are preserved in LICENSE and PATENTS.
 See docs/transport-adapter.md, docs/bitrate-estimator.md,
 docs/inter-arrival-delta.md, docs/alr-detector.md and
 docs/trendline-estimator.md, docs/link-capacity-estimator.md and
-docs/delay-based-bwe.md and docs/loss-based-bwe-v2.md for adaptations.
+docs/delay-based-bwe.md, docs/loss-based-bwe-v2.md, docs/probe-controller.md and
+docs/probe-bitrate-estimator.md and docs/goog-cc-network-control.md for adaptations.

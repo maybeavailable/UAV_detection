@@ -320,6 +320,14 @@ set(UAV_SOURCES
   src/webrtc/congestion_control/aimd_rate_control.cpp # 延迟带宽估计的 AIMD 调速
   src/webrtc/congestion_control/delay_based_bwe.cpp # TWCC 延迟检测与发送端目标码率
   src/webrtc/congestion_control/loss_based_bwe_v2.cpp # 固有/拥塞丢包建模、候选带宽与恢复状态
+  src/webrtc/congestion_control/probe_controller.cpp # 启动、ALR、分配码率与网络恢复探测策略
+  src/webrtc/congestion_control/probe_bitrate_estimator.cpp # 探测簇发送/接收速率与容量估计
+  src/webrtc/congestion_control/network_control.cpp # 拥塞控制输入/输出消息与 pacing 窗口
+  src/webrtc/congestion_control/send_side_bandwidth_estimation.cpp # 延迟/丢包/REMB 仲裁与 RTT 回退
+  src/webrtc/congestion_control/congestion_window_pushback_controller.cpp # 拥塞窗口对编码目标的回压
+  src/webrtc/congestion_control/goog_cc_network_control.cpp # GoogCC 事件驱动总控
+  src/webrtc/congestion_control/bitrate_prober.cpp # 探测簇的 burst 大小、时间与完成条件
+  src/webrtc/congestion_control/gcc_transport_controller.cpp # transport 发送/反馈/RTT/RR 与 GCC 串联
   src/rtsp/rtspserver.cpp
   src/rtsp/rtp_source.cpp
   src/rtsp/rtp_transport.cpp

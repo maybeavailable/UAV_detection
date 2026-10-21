@@ -59,6 +59,9 @@ struct Pair
     std::vector<PeerIceCandidate> candidatesA, candidatesB;
     std::vector<PeerConnection::Bytes> receivedA, receivedB, secureB;
     std::vector<DtlsSrtpKeyMaterial> keysA, keysB;
+    std::vector<CongestionControlEvent> targetsA;
+    std::vector<TransportPacketsFeedback> feedbackA;
+    std::vector<PeerConnection::Bytes> rtpB;
     unsigned errors{0}, connectedA{0}, connectedB{0};
     bool trickle{true};
     explicit Pair(PeerConnection::Config ca = config({PeerMedia::data()}), PeerConnection::Config cb = config({PeerMedia::data()}))
@@ -77,6 +80,9 @@ struct Pair
         ha.onSrtpKeys = [&](auto keys) { keysA.push_back(std::move(keys)); };
         hb.onSrtpKeys = [&](auto keys) { keysB.push_back(std::move(keys)); };
         hb.onSecurePacket = [&](auto packet) { secureB.push_back(std::move(packet.datagram.payload)); };
+        ha.onTargetTransferRate = [&](auto event) { targetsA.push_back(std::move(event)); };
+        ha.onTransportFeedback = [&](auto event) { feedbackA.push_back(std::move(event)); };
+        hb.onRtpPacket = [&](auto packet) { rtpB.push_back(std::move(packet.datagram.payload)); };
         ha.onError = hb.onError = [&](auto ec, auto message) { ++errors; std::cerr << "Peer error " << ec.message() << ": " << message << '\n'; };
         a = std::make_unique<PeerConnection>(io, std::move(ca), std::move(ha));
         b = std::make_unique<PeerConnection>(io, std::move(cb), std::move(hb));
@@ -297,6 +303,32 @@ void boundedCandidatesAndThreads()
     while (!closed && std::chrono::steady_clock::now() < deadline) std::this_thread::sleep_for(1ms);
     work.reset(); worker1.join(); worker2.join(); CHECK(closed && calls == 32);
 }
+void gccOverRealUdp()
+{
+    auto video = PeerMedia::video("video", {{96, "VP8", 90000, 1, {}}});
+    video.feedback = {{std::nullopt, "transport-cc"}};
+    video.extmaps = {{5, {}, "http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01", {}}};
+    auto cfg = config({video}); cfg.dtls.enableSrtp = true; cfg.dtls.rtcp.twccInterval = 10ms;
+    Pair p(cfg, cfg); p.negotiate(); p.connected();
+    until(p.io, [&] { return !p.targetsA.empty() && p.a->snapshot().dtls->congestionControl->active; });
+    CHECK(p.targetsA.back().generation == 0);
+    PeerConnection::Bytes rtp{0x80, 96, 0, 1, 0, 0, 0, 1, 0, 0, 0, 42}; rtp.resize(400, 7);
+    bool sent = false; p.a->asyncSendRtp(rtp, [&](auto ec, auto n) { CHECK(!ec && n == rtp.size()); sent = true; });
+    until(p.io, [&] { return sent && !p.feedbackA.empty() && p.rtpB.size() > 1; });
+    CHECK(p.a->snapshot().dtls->congestionControl->feedback_packets > 0);
+    TargetRateConstraints limits; limits.min_data_rate = 30000; limits.max_data_rate = 120000;
+    CHECK(!perform(p.io, [&](auto done) { p.a->setBitrateConstraints(limits, done); }));
+    until(p.io, [&] { return p.targetsA.back().rate.target_rate <= 120000; });
+    StreamsConfig streams; streams.max_padding_rate = 10000;
+    CHECK(!perform(p.io, [&](auto done) { p.a->setStreamsConfig(streams, done); }));
+    CHECK(p.a->snapshot().dtls->pacer->paddingRateBps > 0);
+    NetworkStateEstimate estimate; estimate.link_capacity_lower = 60000; estimate.link_capacity_upper = 120000;
+    CHECK(!perform(p.io, [&](auto done) { p.a->setNetworkStateEstimate(estimate, done); }));
+    p.negotiate(true); p.connected();
+    until(p.io, [&] { return p.targetsA.back().generation == 1; });
+    CHECK(p.a->snapshot().dtls->congestionControl->generation == 1);
+    p.close();
+}
 } // namespace
 int main()
 {
@@ -304,6 +336,7 @@ int main()
     {
         transportAndRestart(false); transportAndRestart(true); mediaNegotiation(); statesAndValidation();
         incompatibleCodecsAndNoCapabilities(); embeddedCandidatesAndAddingRtp(); externallyResolvedCandidate(); fingerprintFailure(); boundedCandidatesAndThreads();
+        gccOverRealUdp();
         std::cout << "peerconnection tests passed\n"; return 0;
     }
     catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }

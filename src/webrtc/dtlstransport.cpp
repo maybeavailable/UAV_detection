@@ -19,6 +19,7 @@
 #include<algorithm>
 #include<array>
 #include<climits>
+#include<cmath>
 #include<cstring>
 #include<deque>
 #include<mutex>
@@ -286,11 +287,14 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
         std::uint64_t id{0}, version{0}, generation{0};
         std::size_t reservationSize{0};
         bool control{false}, retransmission{false}, submitted{false};
+        bool generatedPadding{false};
+        PacedPacketInfo pacing;
     };
     net::strand<net::io_context::executor_type> strand;
     net::steady_timer timer;
     net::steady_timer rtcpTimer;
     net::steady_timer pacerTimer;
+    net::steady_timer gccTimer;
     Sender sender;
     Config config;
     Callbacks callbacks;
@@ -298,6 +302,14 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
     std::unique_ptr<SrtcpCtl> srtcp;
     std::unique_ptr<RtcpSession> rtcp;
     std::unique_ptr<Pacer> pacer;
+    std::unique_ptr<GccTransportController> gcc;
+    std::uint64_t gccTimerVersion{0}, generatedPaddingPackets{0}, generatedPaddingBytes{0}, probePackets{0}, probeBytes{0};
+    Clock::time_point nextGccProcess{}, probeRetryAt{};
+    Bytes paddingHeader;
+    std::uint32_t paddingSsrc{0};
+    std::uint16_t paddingSequence{0};
+    std::set<std::uint32_t> applicationSsrcs;
+    bool pumpingPacer{false};
     std::map<std::uint64_t, std::shared_ptr<MediaWrite>> pacedWrites;
     std::uint64_t nextMediaId{0}, pacerTimerVersion{0};
     bool rtcpArmed{false};
@@ -324,7 +336,7 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
     Clock::time_point deadline;
 
     Impl(net::io_context& io, Sender send, Config options, Callbacks handlers)
-        : strand(net::make_strand(io)), timer(strand), rtcpTimer(strand), pacerTimer(strand), sender(std::move(send)), config(std::move(options)), callbacks(std::move(handlers))
+        : strand(net::make_strand(io)), timer(strand), rtcpTimer(strand), pacerTimer(strand), gccTimer(strand), sender(std::move(send)), config(std::move(options)), callbacks(std::move(handlers))
     {
         if (!sender || config.component == 0 || config.component > 256 || config.mtu < 576 || config.mtu > 65507 ||
             config.maxPlaintextSize == 0 || config.maxPlaintextSize > 16384 ||
@@ -343,9 +355,24 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
             if (config.rtcp.enabled)
             {
                 config.rtcp.maxDatagramSize = std::min(config.rtcp.maxDatagramSize, config.mtu - 20);
-                rtcp = std::make_unique<RtcpSession>(config.rtcp, RtcpSession::Callbacks{
-                    callbacks.onReceiverReport, callbacks.onNack, callbacks.onKeyFrameRequest, callbacks.onTwccFeedback, callbacks.onTransportFeedback});
+                RtcpSession::Callbacks cb;
+                cb.onReport = [this](auto event) {
+                    if (gcc && gcc->active()) applyGcc(gcc->OnReport(event, Clock::now()));
+                    if (callbacks.onReceiverReport) callbacks.onReceiverReport(std::move(event));
+                };
+                cb.onNack = callbacks.onNack; cb.onKeyFrameRequest = callbacks.onKeyFrameRequest; cb.onTwccFeedback = callbacks.onTwccFeedback;
+                cb.onTransportFeedback = [this](auto feedback) {
+                    if (gcc && gcc->active()) applyGcc(gcc->OnFeedback(feedback, Clock::now()));
+                    if (callbacks.onTransportFeedback) callbacks.onTransportFeedback(std::move(feedback));
+                };
+                cb.onSentPacket = [this](auto packet) { if (gcc && gcc->active()) applyGcc(gcc->OnSentPacket(std::move(packet), Clock::now())); };
+                cb.onRemb = [this](auto event) {
+                    if (gcc && gcc->active() && event.generation == current.generation) applyGcc(gcc->OnRemoteBitrate(event.feedback.bitrateBps, Clock::now()));
+                    if (callbacks.onRemoteBitrateReport) callbacks.onRemoteBitrateReport(std::move(event));
+                };
+                rtcp = std::make_unique<RtcpSession>(config.rtcp, std::move(cb));
             }
+            if (config.congestionControl.enabled && pacer && rtcp) gcc = std::make_unique<GccTransportController>(config.congestionControl);
         }
         if (!config.certificate) config.certificate = DtlsCertificate::generate();
         current.component = config.component; current.localFingerprint = config.certificate->fingerprint();
@@ -381,6 +408,12 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
         if (srtcp) current.srtcp = srtcp->snapshot();
         if (rtcp) current.rtcp = rtcp->snapshot();
         if (pacer) current.pacer = pacer->snapshot(Clock::now());
+        if (gcc)
+        {
+            current.congestionControl = gcc->snapshot();
+            current.congestionControl->padding_packets = generatedPaddingPackets; current.congestionControl->padding_bytes = generatedPaddingBytes;
+            current.congestionControl->probe_packets = probePackets; current.congestionControl->probe_bytes = probeBytes;
+        }
         std::lock_guard<std::mutex> lock(snapshotMutex); published = current;
     }
     void state(DtlsState value)
@@ -425,6 +458,7 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
     }
     void clearSsl()
     {
+        stopGcc();
         ++pacerTimerVersion; pacerTimer.cancel();
         ++rtcpTimerVersion; rtcpTimer.cancel(); rtcpArmed = false;
         if (rtcp) rtcp->invalidate();
@@ -580,6 +614,7 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
             if (ec) { fail(ec, "could not install DTLS-SRTP media keys"); return; }
         }
         state(DtlsState::Connected);
+        startGcc();
         armRtcp();
         UAV_LOG_INFO << "[WebRTC][DTLS " << this << "][g=" << current.generation << "][c=" << config.component << "] handshake verified"
             << " role=" << (*current.localSetup == SdpSetupRole::Active ? "client" : "server") << " cipher=" << current.cipher
@@ -763,6 +798,165 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
         auto write = std::make_shared<Write>(); write->payload = std::move(bytes); write->done = std::move(done);
         pendingBytes += write->payload.size(); writes.push_back(std::move(write)); publish(); drive();
     }
+    bool gccCanRun() const
+    {
+        return gcc && pacer && rtcp && !closing && current.state == DtlsState::Connected &&
+            srtp->snapshot().state == SrtpState::Ready && std::any_of(config.rtcp.parameters.media.begin(), config.rtcp.parameters.media.end(),
+                [](const auto& m) { return m.send; });
+    }
+    void updateCongestion()
+    {
+        if (!pacer) return;
+        const auto window = gcc && gcc->active() ? gcc->snapshot().congestion_window : std::optional<std::size_t>{};
+        const bool unavailable = gcc && gcc->active() && !gcc->snapshot().network_available;
+        pacer->setCongested(unavailable || (window && rtcp->outstandingData() >= *window));
+    }
+    void cancelGeneratedPadding()
+    {
+        if (!pacer) return;
+        const bool wasPumping = pumpingPacer; pumpingPacer = true;
+        struct Guard { bool& value; bool old; ~Guard() { value = old; } } guard{pumpingPacer, wasPumping};
+        for (auto it = pacedWrites.begin(); it != pacedWrites.end();)
+        {
+            if (!it->second->generatedPadding) { ++it; continue; }
+            auto write = it->second; it = pacedWrites.erase(it);
+            (void)pacer->remove(write->id, Clock::now()); releaseMedia(write, net::error::operation_aborted);
+        }
+    }
+    void applyGcc(NetworkControlUpdate update)
+    {
+        if (!gcc || !gcc->active()) return;
+        if (update.pacer_config)
+        {
+            const auto raw = update.pacer_config->data_rate();
+            const auto rate = raw ? std::clamp<std::uint64_t>(raw, 1000, IntervalBudget::MaxRateBps) : 0;
+            const auto rawPad = update.pacer_config->pad_rate();
+            const auto pad = rawPad < 1000 ? 0 : std::min(rawPad, rate);
+            const auto old = pacer->snapshot(Clock::now());
+            if (old.rateBps != rate || old.paddingRateBps != pad)
+            {
+                require(pacer->setRates(rate, pad, Clock::now()), "cannot apply GCC pacing rates");
+                if (!pad) cancelGeneratedPadding();
+            }
+        }
+        updateCongestion(); publish();
+        if (update.target_rate && callbacks.onTargetTransferRate) callbacks.onTargetTransferRate({current.generation, *update.target_rate});
+        armGcc();
+    }
+    void stopGcc()
+    {
+        ++gccTimerVersion; gccTimer.cancel();
+        if (gcc) { gcc->Stop(); gcc->prober().SetAllowProbeWithoutMediaPacket(false); }
+        if (pacer) pacer->setCongested(false);
+        paddingHeader.clear();
+    }
+    void startGcc()
+    {
+        if (!gccCanRun() || gcc->active()) return;
+        const bool twcc = std::any_of(config.rtcp.parameters.media.begin(), config.rtcp.parameters.media.end(),
+            [](const auto& m) { return m.send && m.transportCc && m.sendTwccExtension; });
+        const auto now = Clock::now(); nextGccProcess = now + GoogCcNetworkController::GetProcessInterval(); probeRetryAt = now;
+        applyGcc(gcc->Start(current.generation, twcc, now));
+        UAV_LOG_INFO << "[WebRTC][GCC Transport][g=" << current.generation << "] started TWCC=" << twcc;
+    }
+    bool canPad() const
+    { return gcc && gcc->active() && config.congestionControl.generate_padding && !paddingHeader.empty() && paddingSsrc && !applicationSsrcs.count(paddingSsrc); }
+    void rememberPaddingHeader(const Bytes& bytes)
+    {
+        RtpPacketParser rtp(bytes.data(), bytes.size()); if (!rtp.valid() || !rtp.payloadSize()) return;
+        if (applicationSsrcs.size() >= config.srtp.maxStreams && !applicationSsrcs.count(rtp.ssrc())) return;
+        applicationSsrcs.insert(rtp.ssrc());
+        const auto m = std::find_if(config.rtcp.parameters.media.begin(), config.rtcp.parameters.media.end(),
+            [&](const auto& p) { return p.payloadType == rtp.payloadType() && p.send && p.transportCc && p.sendTwccExtension; });
+        if (m == config.rtcp.parameters.media.end()) return;
+        if (!paddingSsrc || applicationSsrcs.count(paddingSsrc))
+        {
+            if (config.congestionControl.padding_ssrc) paddingSsrc = config.congestionControl.padding_ssrc;
+            else do { require(RAND_bytes(reinterpret_cast<unsigned char*>(&paddingSsrc), sizeof(paddingSsrc)) == 1, "cannot generate padding SSRC"); }
+                 while (!paddingSsrc || applicationSsrcs.count(paddingSsrc));
+        }
+        const auto headerSize = static_cast<std::size_t>(rtp.payload() - bytes.data());
+        paddingHeader.assign(bytes.begin(), bytes.begin() + headerSize);
+        paddingHeader[0] |= 0x20; paddingHeader[1] &= 0x7f;
+        for (unsigned i = 0; i < 4; ++i) paddingHeader[8 + i] = static_cast<std::uint8_t>(paddingSsrc >> (24 - i * 8));
+        if (gcc && gcc->active()) gcc->prober().SetAllowProbeWithoutMediaPacket(canPad());
+    }
+    Bytes makePadding(std::size_t requested)
+    {
+        if (!canPad()) return {};
+        const auto crypto = srtp->snapshot();
+        const auto limit = std::min(crypto.maxPlaintextSize, config.mtu - crypto.overhead);
+        if (paddingHeader.size() >= limit) return {};
+        const auto base = paddingHeader.size() + crypto.overhead + config.pacer.transportOverheadBytes;
+        const auto count = std::clamp<std::size_t>(requested > base ? requested - base : 1, 1, std::min<std::size_t>(255, limit - paddingHeader.size()));
+        auto bytes = paddingHeader; bytes.resize(bytes.size() + count, 0); bytes.back() = static_cast<std::uint8_t>(count); return bytes;
+    }
+    std::shared_ptr<MediaWrite> sendPadding(const PacedPacketInfo& pacing, std::size_t requested, bool probe)
+    {
+        auto bytes = makePadding(requested); if (bytes.empty()) return {};
+        auto write = sendMedia(std::move(bytes), false, current.generation, {}, false, {}, pacing, probe, true);
+        if (probe && write && write->submitted) pacer->accountProbeBytes(write->ciphertextSize + config.pacer.transportOverheadBytes);
+        return write;
+    }
+    void armGcc()
+    {
+        ++gccTimerVersion; gccTimer.cancel();
+        if (!gccCanRun() || !gcc->active()) return;
+        const auto now = Clock::now(); auto when = std::max(now, nextGccProcess);
+        const auto pacing = pacer->snapshot(now);
+        if (pacing.queuedPackets)
+            when = std::min(when, now + std::max(std::chrono::microseconds(0),
+                std::chrono::duration_cast<std::chrono::microseconds>(config.pacer.maxQueueDelay) - pacing.oldestWait));
+        if (!pacing.paused && !pacing.congested && pacing.rateBps && (canPad() || pacing.queuedPackets))
+            if (const auto probe = gcc->prober().NextProbeTime(now))
+                when = std::min(when, std::max({now + std::chrono::microseconds(200), *probe, probeRetryAt}));
+        gccTimer.expires_at(when); const auto version = gccTimerVersion; const auto weak = weak_from_this();
+        gccTimer.async_wait([weak, version](ErrorCode ec) {
+            if (const auto self = weak.lock(); self && !ec && version == self->gccTimerVersion && self->gccCanRun()) self->guarded([&] {
+                const auto now = Clock::now();
+                if (now >= self->nextGccProcess)
+                {
+                    self->nextGccProcess = now + GoogCcNetworkController::GetProcessInterval();
+                    self->applyGcc(self->gcc->Process(now, self->pacer->snapshot(now).queuedBytes, self->rtcp->outstandingData()));
+                }
+                self->pumpPacer(); self->publish(); self->armGcc();
+            });
+        });
+    }
+    void pumpProbe()
+    {
+        if (!gcc || !gcc->active()) return;
+        const auto now = Clock::now(); const auto pacing = pacer->snapshot(now);
+        if (pacing.paused || pacing.congested || !pacing.rateBps || now < probeRetryAt) return;
+        auto cluster = gcc->prober().CurrentCluster(now); const auto due = gcc->prober().NextProbeTime(now);
+        if (!cluster || !due || *due > now) return;
+        const auto target = std::max<std::size_t>(1, gcc->prober().RecommendedMinProbeSize());
+        std::size_t sent = 0, total = 0;
+        for (unsigned i = 0; i < 64 && sent < target && total < config.pacer.maxBurstBytes && !closing; ++i)
+        {
+            updateCongestion(); if (pacer->snapshot(Clock::now()).congested) break;
+            std::shared_ptr<MediaWrite> write;
+            if (const auto p = pacer->pop(Clock::now(), true))
+            {
+                const auto found = pacedWrites.find(p->id); if (found == pacedWrites.end()) continue;
+                write = found->second; pacedWrites.erase(found);
+                if (!write->retransmission)
+                {
+                    RtpPacketParser r(write->payload.data(), write->payload.size());
+                    const bool tracked = std::any_of(config.rtcp.parameters.media.begin(), config.rtcp.parameters.media.end(),
+                        [&](const auto& m) { return m.send && m.transportCc && m.sendTwccExtension && m.payloadType == r.payloadType(); });
+                    if (tracked) write->pacing = *cluster;
+                }
+                dispatchMedia(write);
+            }
+            else write = sendPadding(*cluster, target - sent, true);
+            if (!write || !write->submitted) break;
+            const auto bytes = write->ciphertextSize + config.pacer.transportOverheadBytes; total += bytes;
+            if (write->pacing.probe_cluster_id == cluster->probe_cluster_id && write->transportSequence) sent += bytes;
+        }
+        if (sent) gcc->prober().ProbeSent(Clock::now(), sent);
+        probeRetryAt = Clock::now() + (sent ? std::chrono::microseconds(200) : std::chrono::duration_cast<std::chrono::microseconds>(config.pacer.processInterval));
+    }
     void flushRtcp(Completion done = {})
     {
         if (!rtcp || closing || current.state != DtlsState::Connected) return;
@@ -813,6 +1007,8 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
         else
         {
             config.rtcp.parameters = std::move(parameters);
+            // Renegotiation invalidates the adapter history and probe/PT mapping.
+            cancelGeneratedPadding(); stopGcc(); startGcc();
             ++rtcpTimerVersion; rtcpTimer.cancel(); rtcpArmed = false; armRtcp(); publish();
             UAV_LOG_DEBUG << "[WebRTC][RTCP][g=" << current.generation << "] configured payloads=" << config.rtcp.parameters.media.size()
                 << " reduced_size=" << config.rtcp.parameters.reducedSize;
@@ -848,6 +1044,7 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
             }
             else rtcp->receivedRtp(packet.datagram.payload, packet.datagram.receivedAt);
         }
+        if (gcc && gcc->active()) pumpPacer();
         publish();
         const auto& handler = packet.type == IcePacketType::Rtcp ? callbacks.onRtcpPacket : callbacks.onRtpPacket;
         if (handler) handler(std::move(packet));
@@ -868,16 +1065,20 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
             rtcp->sentRtp(write->trackedPlaintext, std::move(write->trackedCiphertext), write->sentAt, false, write->transportSequence);
         publish(); finishMediaWrite(write, ec);
         if (closing) finishClose();
+        else if (write->version == session && gcc && gcc->active()) pumpPacer();
     }
     void dispatchMedia(const std::shared_ptr<MediaWrite>& write)
     {
         if (closing || write->version != session || write->generation != current.generation || current.state != DtlsState::Connected)
         { releaseMedia(write, net::error::operation_aborted); return; }
         auto bytes = std::move(write->payload); ErrorCode ec;
+        if (write->generatedPadding)
+        { bytes[2] = static_cast<std::uint8_t>(paddingSequence >> 8); bytes[3] = static_cast<std::uint8_t>(paddingSequence++); }
         if (!write->control && !write->retransmission && rtcp)
         {
             if (!rtcp->prepareRtp(bytes)) { releaseMedia(write, SrtpError::InvalidPacket); return; }
             write->trackedPlaintext = bytes;
+            if (!write->generatedPadding && gcc && gcc->active()) rememberPaddingHeader(bytes);
         }
         if (!write->retransmission) ec = write->control ? srtcp->protect(bytes, current.generation) : srtp->protect(bytes, current.generation);
         if (ec)
@@ -894,10 +1095,12 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
         if (rtcp && !write->control)
         {
             if (write->retransmission)
-            { if (write->transportSequence) rtcp->retransmittedRtp(*write->transportSequence, write->sentAt); }
+            { rtcp->retransmittedRtp(write->transportSequence.value_or(-1), write->sentAt, bytes.size(), config.pacer.transportOverheadBytes); }
             else write->transportSequence = rtcp->sendingRtp(write->trackedPlaintext, bytes.size(), write->sentAt, write->sentAt,
-                config.pacer.transportOverheadBytes);
+                config.pacer.transportOverheadBytes, write->pacing);
         }
+        if (write->generatedPadding) { ++generatedPaddingPackets; generatedPaddingBytes += bytes.size(); }
+        if (write->pacing.probe_cluster_id >= 0 && write->transportSequence) { ++probePackets; probeBytes += bytes.size() + config.pacer.transportOverheadBytes; }
         const auto self = shared_from_this();
         SendHandler finish = [self, write](ErrorCode result, std::size_t size) {
             net::post(self->strand, [self, write, result, size] { self->releaseMedia(write, result, size); });
@@ -907,7 +1110,10 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
     }
     void pumpPacer()
     {
-        if (!pacer || closing || current.state != DtlsState::Connected) return;
+        if (!pacer || closing || current.state != DtlsState::Connected || pumpingPacer) return;
+        pumpingPacer = true;
+        struct Guard { bool& value; ~Guard() { value = false; } } guard{pumpingPacer};
+        updateCongestion();
         const auto oldRate = pacer->snapshot(Clock::now()).adjustedRateBps;
         ++pacerTimerVersion; pacerTimer.cancel();
         const auto expired = pacer->expire(Clock::now());
@@ -921,9 +1127,17 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
             const auto n = pacer->snapshot(Clock::now()).expiredPackets;
             UAV_LOG_IF(LogLevel::WARN, n == expired.size() || (n & (n - 1)) == 0) << "[WebRTC][Pacer][g=" << current.generation << "] expired RTP packets=" << n;
         }
+        pumpProbe();
+        // A probing session owns scheduling until its last cluster completes.
+        const bool probing = gcc && gcc->active() && gcc->prober().is_probing();
         // Limit each batch so a high pacing rate cannot monopolize the transport strand.
-        for (unsigned i = 0; i < 64 && !closing && current.state == DtlsState::Connected; ++i)
+        for (unsigned i = 0; i < 64 && !probing && !closing && current.state == DtlsState::Connected; ++i)
         {
+            updateCongestion();
+            const auto state = pacer->snapshot(Clock::now());
+            if (canPad() && !state.paused && !state.congested && state.rateBps && state.paddingRateBps && state.queuedPackets < 2 &&
+                writes.size() + mediaWrites.size() < config.maxPendingMessages)
+                (void)sendPadding({}, config.mtu, false);
             const auto packet = pacer->pop(Clock::now()); if (!packet) break;
             const auto found = pacedWrites.find(packet->id); if (found == pacedWrites.end()) continue;
             auto write = found->second; pacedWrites.erase(found); dispatchMedia(write);
@@ -934,6 +1148,8 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
                 << " pacing_rate_bps=" << pacing.rateBps << " queued_bytes=" << pacing.queuedBytes;
         publish();
         if (closing || current.state != DtlsState::Connected) return;
+        armGcc();
+        if (probing) return; // Probe timer also performs queue expiration; avoid an immediate ordinary pacing wakeup.
         const auto wakeup = pacer->nextWakeup(Clock::now()); if (!wakeup) return;
         pacerTimer.expires_at(*wakeup); const auto version = pacerTimerVersion; const auto weak = weak_from_this();
         pacerTimer.async_wait([weak, version](ErrorCode ec) {
@@ -945,7 +1161,7 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
     {
         ErrorCode ec;
         if (closing || current.state == DtlsState::Closed || current.state == DtlsState::Failed) ec = net::error::operation_aborted;
-        else if (!pacer) ec = net::error::operation_not_supported;
+        else if (!pacer || (gcc && gcc->active())) ec = net::error::operation_not_supported;
         else if (!pacer->setRates(rate, padding.value_or(config.pacer.paddingRateBps), Clock::now())) ec = net::error::invalid_argument;
         else
         {
@@ -957,8 +1173,8 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
         }
         complete(done, ec);
     }
-    void sendMedia(Bytes bytes, bool control, std::optional<std::uint64_t> generation, SendHandler done, bool retransmission = false,
-        std::optional<std::int64_t> retransmissionSequence = {})
+    std::shared_ptr<MediaWrite> sendMedia(Bytes bytes, bool control, std::optional<std::uint64_t> generation, SendHandler done, bool retransmission = false,
+        std::optional<std::int64_t> retransmissionSequence = {}, const PacedPacketInfo& pacing = {}, bool directProbe = false, bool generatedPadding = false)
     {
         ErrorCode ec;
         const auto plainSize = bytes.size();
@@ -977,16 +1193,17 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
             else if (writes.size() + mediaWrites.size() >= config.maxPendingMessages ||
                 bytes.size() + overhead > config.maxPendingBytes - pendingBytes - mediaBytes) ec = net::error::no_buffer_space;
         }
-        if (ec) { if (done) done(ec, 0); return; }
+        if (ec) { if (done) done(ec, 0); return {}; }
         // Reserve queue storage before consuming SRTP/TWCC sequences; actual crypto runs at egress.
         auto write = std::make_shared<MediaWrite>();
         write->transportSequence = retransmissionSequence;
         write->plaintextSize = plainSize; write->done = std::move(done); write->payload = std::move(bytes);
         write->id = ++nextMediaId; write->version = session; write->generation = current.generation;
         write->control = control; write->retransmission = retransmission;
+        write->pacing = pacing; write->generatedPadding = generatedPadding;
         write->reservationSize = write->payload.size() + (retransmission ? 0 : (control ? srtcp->snapshot() : srtp->snapshot()).overhead);
         mediaWrites.insert(write); mediaBytes += write->reservationSize;
-        if (!control && pacer)
+        if (!control && pacer && !directProbe)
         {
             RtpPacketParser rtp(write->payload.data(), write->payload.size());
             Pacer::Priority priority = retransmission ? Pacer::Priority::Retransmission : Pacer::Priority::Video;
@@ -1001,10 +1218,12 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
                 (std::uint32_t(write->payload[10]) << 8) | write->payload[11];
             const auto admission = pacer->enqueue({write->id, current.generation, ssrc, priority, write->reservationSize}, Clock::now());
             if (admission != Pacer::Admission::Accepted)
-            { releaseMedia(write, admission == Pacer::Admission::QueueFull ? ErrorCode(net::error::no_buffer_space) : ErrorCode(net::error::invalid_argument)); return; }
+            { releaseMedia(write, admission == Pacer::Admission::QueueFull ? ErrorCode(net::error::no_buffer_space) : ErrorCode(net::error::invalid_argument)); return {}; }
+            if (gcc && gcc->active() && !retransmission && !generatedPadding) gcc->OnPacketQueued(write->reservationSize + config.pacer.transportOverheadBytes);
             pacedWrites.emplace(write->id, write); publish(); pumpPacer();
         }
         else dispatchMedia(write);
+        return write;
     }
     ErrorCode reset(std::uint64_t generation)
     {
@@ -1020,12 +1239,16 @@ struct DtlsTransport::Impl : std::enable_shared_from_this<DtlsTransport::Impl>
         }
         cancelWrites(net::error::operation_aborted);
         if (pacer) pacer->reset(generation, Clock::now());
+        if (gcc) gcc->Reset(generation);
+        paddingSsrc = 0; paddingSequence = 0; applicationSsrcs.clear();
+        generatedPaddingPackets = generatedPaddingBytes = probePackets = probeBytes = 0;
         state(DtlsState::New); return {};
     }
     void beginClose()
     {
         if (closing || current.state == DtlsState::Closed) return;
         closing = true; ++timerVersion; timer.cancel();
+        stopGcc();
         ++rtcpTimerVersion; rtcpTimer.cancel(); rtcpArmed = false;
         if (srtp) { srtp->close(); srtcp->close(); }
         state(DtlsState::Closing); cancelWrites(net::error::operation_aborted);
@@ -1081,6 +1304,16 @@ void DtlsTransport::handleIceState(IceTransport::Snapshot state)
         if (state.generation > self->current.generation) self->reset(state.generation);
         if (state.state == IceTransportState::Closed) self->close({});
         else if (state.state == IceTransportState::Failed) self->fail(net::error::connection_reset, "DTLS ICE transport failed");
+        else if (self->gcc && self->gcc->active() && (state.state == IceTransportState::Disconnected ||
+            state.state == IceTransportState::Connected || state.state == IceTransportState::Completed))
+        {
+            const bool available = state.state != IceTransportState::Disconnected;
+            if (self->gcc->snapshot().network_available != available)
+            {
+                self->applyGcc(self->gcc->OnNetworkAvailability(available, Clock::now()));
+                self->pumpPacer(); self->publish();
+            }
+        }
     });
 }
 void DtlsTransport::asyncSend(Bytes plaintext, SendHandler done)
@@ -1181,9 +1414,68 @@ void DtlsTransport::setPacingPaused(bool paused, Completion done)
         else if (!self->pacer) ec = net::error::operation_not_supported;
         else
         {
+            if (paused && self->gcc) self->gcc->prober().Reset();
             self->pacer->setPaused(paused, Clock::now()); self->pumpPacer(); self->publish();
             UAV_LOG_DEBUG << "[WebRTC][Pacer][g=" << self->current.generation << "] paused=" << paused;
         }
+        complete(done, ec);
+    });
+}
+void DtlsTransport::setBitrateConstraints(TargetRateConstraints constraints, Completion done)
+{
+    const auto self = impl_; net::post(self->strand, [self, constraints, done = std::move(done)]() mutable {
+        ErrorCode ec;
+        if (self->closing || self->current.state == DtlsState::Closed || self->current.state == DtlsState::Failed) ec = net::error::operation_aborted;
+        else if (!self->gcc) ec = net::error::operation_not_supported;
+        else try
+        {
+            auto config = self->config.congestionControl;
+            config.min_bitrate = std::max<std::uint64_t>(5000, constraints.min_data_rate.value_or(0)); config.max_bitrate = constraints.max_data_rate;
+            if (config.max_bitrate && *config.max_bitrate < config.min_bitrate) config.max_bitrate = config.min_bitrate;
+            if (constraints.starting_rate) config.start_bitrate = *constraints.starting_rate;
+            GccTransportController checked(config);
+            if (self->gcc->active()) self->applyGcc(self->gcc->SetConstraints(constraints, Clock::now()));
+            self->config.congestionControl = config;
+            if (!self->gcc->active()) self->gcc = std::make_unique<GccTransportController>(config);
+            self->pumpPacer(); self->publish();
+        }
+        catch (const std::invalid_argument&) { ec = net::error::invalid_argument; }
+        complete(done, ec);
+    });
+}
+void DtlsTransport::setStreamsConfig(StreamsConfig streams, Completion done)
+{
+    const auto self = impl_; net::post(self->strand, [self, streams, done = std::move(done)]() mutable {
+        ErrorCode ec;
+        if (self->closing || self->current.state == DtlsState::Closed || self->current.state == DtlsState::Failed) ec = net::error::operation_aborted;
+        else if (!self->gcc) ec = net::error::operation_not_supported;
+        else try
+        {
+            if (streams.pacing_factor && (!std::isfinite(*streams.pacing_factor) || *streams.pacing_factor <= 0)) throw std::invalid_argument("invalid pacing factor");
+            for (const auto rate : {streams.min_total_allocated_bitrate, streams.max_padding_rate, streams.max_total_allocated_bitrate})
+                if (rate) SendSideBandwidthEstimation::ValidateRate(*rate);
+            if (self->gcc->active()) self->applyGcc(self->gcc->SetStreams(streams, Clock::now()));
+            auto& config = self->config.congestionControl.streams;
+            if (streams.requests_alr_probing) config.requests_alr_probing = streams.requests_alr_probing;
+            if (streams.pacing_factor) config.pacing_factor = streams.pacing_factor;
+            if (streams.min_total_allocated_bitrate) config.min_total_allocated_bitrate = streams.min_total_allocated_bitrate;
+            if (streams.max_padding_rate) config.max_padding_rate = streams.max_padding_rate;
+            if (streams.max_total_allocated_bitrate) config.max_total_allocated_bitrate = streams.max_total_allocated_bitrate;
+            if (!self->gcc->active()) { config.enable_repeated_initial_probing = streams.enable_repeated_initial_probing; self->gcc = std::make_unique<GccTransportController>(self->config.congestionControl); }
+            self->pumpPacer(); self->publish();
+        }
+        catch (const std::invalid_argument&) { ec = net::error::invalid_argument; }
+        complete(done, ec);
+    });
+}
+void DtlsTransport::setNetworkStateEstimate(NetworkStateEstimate estimate, Completion done)
+{
+    const auto self = impl_; net::post(self->strand, [self, estimate, done = std::move(done)]() mutable {
+        ErrorCode ec;
+        if (self->closing || self->current.state == DtlsState::Closed || self->current.state == DtlsState::Failed) ec = net::error::operation_aborted;
+        else if (!self->gcc || !self->gcc->active()) ec = net::error::operation_not_supported;
+        else try { self->applyGcc(self->gcc->SetNetworkEstimate(estimate, Clock::now())); self->publish(); }
+        catch (const std::invalid_argument&) { ec = net::error::invalid_argument; }
         complete(done, ec);
     });
 }

@@ -3,6 +3,7 @@
 
 #include<algorithm>
 #include<set>
+#include<limits>
 #include<stdexcept>
 
 namespace webrtc
@@ -158,6 +159,17 @@ bool parseRtcp(const std::uint8_t* data, std::size_t size, std::vector<RtcpMessa
             {
                 RtcpTwcc f; if (!twcc(p, n, f)) return false; parsed.emplace_back(std::move(f));
             }
+            else if (p[1] == 206 && fmt == 15 && n >= 16 && p[12] == 'R' && p[13] == 'E' && p[14] == 'M' && p[15] == 'B')
+            {
+                if (n < 20 || !p[16] || n != 20 + std::size_t(p[16]) * 4 || u32(p + 8)) return false;
+                RtcpRemb f; f.senderSsrc = u32(p + 4);
+                const unsigned exponent = p[17] >> 2;
+                const auto mantissa = (std::uint64_t(p[17] & 3) << 16) | u16(p + 18);
+                constexpr auto max = std::numeric_limits<std::uint64_t>::max();
+                f.bitrateBps = mantissa > (max >> exponent) ? max : mantissa << exponent;
+                for (unsigned i = 0; i < p[16]; ++i) f.ssrcs.push_back(u32(p + 20 + i * 4));
+                parsed.emplace_back(std::move(f));
+            }
         }
         else if (p[1] == 202)
         {
@@ -195,6 +207,17 @@ RtcpBytes buildRtcpReport(const RtcpReport& r)
         put32(b, block.ssrc); b.push_back(block.fractionLost); put24(b, static_cast<std::uint32_t>(block.cumulativeLost));
         put32(b, block.highestSequence); put32(b, block.jitter); put32(b, block.lsr); put32(b, block.dlsr);
     }
+    return finish(std::move(b));
+}
+RtcpBytes buildRtcpRemb(const RtcpRemb& f)
+{
+    if (f.ssrcs.empty() || f.ssrcs.size() > 255) throw std::invalid_argument("invalid REMB SSRC count");
+    auto b = header(206, 15, f.senderSsrc); put32(b, 0);
+    b.insert(b.end(), {'R', 'E', 'M', 'B'}); b.push_back(static_cast<std::uint8_t>(f.ssrcs.size()));
+    auto mantissa = f.bitrateBps; unsigned exponent = 0;
+    while (mantissa > 0x3ffff) { mantissa >>= 1; ++exponent; }
+    b.push_back(static_cast<std::uint8_t>((exponent << 2) | (mantissa >> 16))); put16(b, static_cast<std::uint16_t>(mantissa));
+    for (auto ssrc : f.ssrcs) put32(b, ssrc);
     return finish(std::move(b));
 }
 RtcpBytes buildRtcpSdes(std::uint32_t ssrc, const std::string& cname)

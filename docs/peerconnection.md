@@ -18,7 +18,7 @@ PeerConnection 持有并管理 [DataChannel](datachannel.md)，通过 `createDat
 
 启用内置 SRTP 后，下层还管理 [自动 RTCP 报告与反馈](rtcp-feedback.md)：SR/RR、NACK 密文重传、PLI/FIR 关键帧请求和 TWCC。PeerConnection 按 SDP 配置 PT、时钟、反馈能力和扩展 ID，并转交相关事件与 `requestPli` 请求。
 
-内置 RTP 默认经下层 [pacer](pacer.md) 节奏发送；通过 `config.dtls.pacer` 设置初始预算/队列，并用 `setPacingRate` / `setPacingRates` / `setPacingPaused` 转交发送端估计器的媒体/padding 速率和暂停状态。
+内置 RTP 默认经下层 [pacer](pacer.md) 节奏发送，[GCC](goog-cc-network-control.md) 由 DtlsTransport 管理，自动消费实际发送和 TWCC/RR/RTT/REMB，调整 pacing 并执行探测。通过 `config.dtls.congestionControl` 设置码率范围/stream 配置，`onTargetTransferRate` 接收带 generation 的目标码率和丢帧比例，再投递编码线程。`setBitrateConstraints` / `setStreamsConfig` / `setNetworkStateEstimate` 转交下层；PeerConnection 不持有估计器或 Pacer。`setPacingPaused` 暂停媒体；手动 `setPacingRate(s)` 要求关闭 `config.dtls.congestionControl.enabled`。
 
 配置分层：`config.enableDataChannels` / `config.dataChannel` 配置 DataChannel；`config.dtls.enableSrtp` / `config.dtls.srtp` / `config.dtls.srtcp` 配置下层媒体保护。两个启用开关默认 false，保留原有外部 SCTP 和外部 SRTP 接口；推荐常规应用启用内置模块。内置媒体模式使用 `asyncSendRtp` / `asyncSendRtcp` 输入完整明文，由 `onRtpPacket` / `onRtcpPacket` 接收已认证的明文。配置、状态与统计均沿 transport 分层，媒体统计位于 `snapshot().dtls->srtp/srtcp`。
 

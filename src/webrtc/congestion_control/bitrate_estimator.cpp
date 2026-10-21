@@ -35,7 +35,13 @@ BitrateEstimator::BitrateEstimator(Config config) : config_(config)
         config_.window < Ms(150) || config_.window > Ms(1000) ||
         !validScale(config_.uncertainty_scale) || !validScale(config_.uncertainty_scale_in_alr) ||
         !validScale(config_.small_sample_uncertainty_scale))
+    {
+        UAV_LOG_WARN << "[WebRTC][BitrateEstimator] invalid configuration initial_window_ms=" << config_.initial_window.count()
+            << " window_ms=" << config_.window.count();
         throw std::invalid_argument("invalid bitrate estimator configuration");
+    }
+    UAV_LOG_INFO << "[WebRTC][BitrateEstimator][" << this << "] initialized initial_window_ms=" << config_.initial_window.count()
+        << " window_ms=" << config_.window.count() << " floor_bps=" << config_.estimate_floor_bps;
 }
 BitrateEstimator::~BitrateEstimator() = default;
 
@@ -47,12 +53,14 @@ void BitrateEstimator::Update(Time at_time, std::size_t amount, bool in_alr)
     const auto us = std::chrono::duration_cast<std::chrono::microseconds>(at_time.time_since_epoch()).count();
     const auto ms = us / 1000 + (us % 1000 >= 500) - (us % 1000 <= -500);
     const float sample = UpdateWindow(ms, amount, window_ms, &is_small_sample);
+    UAV_LOG_IF(LogLevel::TRACE, LogManager::getInstance().shouldLog(LogLevel::TRACE)) << "[WebRTC][BitrateEstimator][" << this << "] receive_ms=" << ms << " bytes=" << amount
+        << " accumulated_bytes=" << sum_ << " window_ms=" << current_window_ms_ << " in_alr=" << in_alr;
     if (sample < 0) return;
     if (bitrate_estimate_kbps_ < 0)
     {
         // The boundary packet belongs to the next window, not this first sample.
         bitrate_estimate_kbps_ = sample;
-        UAV_LOG_DEBUG << "[WebRTC][BitrateEstimator] initialized acknowledged_bps=" << *bitrate();
+        UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][BitrateEstimator] initialized acknowledged_bps=" << *bitrate();
         return;
     }
     float scale = static_cast<float>(config_.uncertainty_scale);
@@ -91,6 +99,8 @@ void BitrateEstimator::Update(Time at_time, std::size_t amount, bool in_alr)
     }
     bitrate_estimate_kbps_ = std::max(bitrate_estimate_kbps_,
         static_cast<float>(config_.estimate_floor_bps) * 0.001f);
+    UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][BitrateEstimator][" << this << "] sample_kbps=" << sample << " acknowledged_bps=" << *bitrate()
+        << " variance=" << bitrate_estimate_var_ << " small_sample=" << is_small_sample << " in_alr=" << in_alr;
 }
 
 float BitrateEstimator::UpdateWindow(std::int64_t now_ms, std::size_t bytes,
@@ -98,6 +108,8 @@ float BitrateEstimator::UpdateWindow(std::int64_t now_ms, std::size_t bytes,
 {
     if (prev_time_ms_ && now_ms < *prev_time_ms_)
     {
+        UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][BitrateEstimator][" << this << "] backwards receive clock now_ms=" << now_ms
+            << " previous_ms=" << *prev_time_ms_ << ", resetting sample window";
         prev_time_ms_.reset(); sum_ = 0; current_window_ms_ = 0;
     }
     if (prev_time_ms_)
@@ -106,6 +118,8 @@ float BitrateEstimator::UpdateWindow(std::int64_t now_ms, std::size_t bytes,
         current_window_ms_ += gap;
         if (gap > rate_window_ms)
         {
+            UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][BitrateEstimator][" << this << "] sample window gap_ms=" << gap
+                << " window_ms=" << rate_window_ms << ", discarding stale bytes=" << sum_;
             sum_ = 0;
             current_window_ms_ %= rate_window_ms;
         }
@@ -145,6 +159,6 @@ std::optional<std::uint64_t> BitrateEstimator::PeekRate() const
 void BitrateEstimator::ExpectFastRateChange()
 {
     bitrate_estimate_var_ += 200.0f;
-    UAV_LOG_DEBUG << "[WebRTC][BitrateEstimator] expecting fast rate change";
+    UAV_LOG_IF(LogLevel::DEBUG, LogManager::getInstance().shouldLog(LogLevel::DEBUG)) << "[WebRTC][BitrateEstimator] expecting fast rate change";
 }
 } // namespace webrtc

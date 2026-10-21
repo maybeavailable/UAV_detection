@@ -1,4 +1,5 @@
 #include"webrtc/dtlstransport.h"
+#include"common/rtp_packet.h"
 
 #include<openssl/ec.h>
 #include<openssl/pem.h>
@@ -56,16 +57,19 @@ struct Link
     std::vector<TwccFeedbackEvent> twccAtA;
     std::vector<TransportPacketsFeedback> transportAtA;
     std::vector<RtcpReportEvent> reportsAtA;
+    std::vector<CongestionControlEvent> targetsAtA;
+    std::vector<RtcpRembEvent> rembAtA;
     std::vector<std::chrono::steady_clock::time_point> rtpSendTimesAtA;
     std::vector<UdpSocket::SendHandler> heldMedia;
     unsigned connectedA{0}, connectedB{0}, errors{0};
     bool dropFirst{false}, corruptNextApplication{false};
     bool dropNextMedia{false}, holdMedia{false};
-    bool deliverHeldMedia{false}, failNextRtpAtA{false};
+    bool deliverHeldMedia{false}, failNextRtpAtA{false}, holdRtpOnly{false};
     bool failNextPliAtB{false};
     Bytes firstApplication;
-    explicit Link(DtlsTransport::Config firstConfig = {}, DtlsTransport::Config secondConfig = {})
+    explicit Link(DtlsTransport::Config firstConfig = {}, DtlsTransport::Config secondConfig = {}, bool enableGcc = false)
     {
+        if (!enableGcc) firstConfig.congestionControl.enabled = secondConfig.congestionControl.enabled = false;
         firstConfig.certificate = firstCertificate; secondConfig.certificate = secondCertificate;
         DtlsTransport::Callbacks firstCallbacks, secondCallbacks;
         firstCallbacks.onState = [&, paced = firstConfig.enableSrtp && firstConfig.pacer.enabled](auto state) {
@@ -86,6 +90,8 @@ struct Link
         firstCallbacks.onTwccFeedback = [&](auto event) { twccAtA.push_back(std::move(event)); };
         firstCallbacks.onTransportFeedback = [&](auto event) { transportAtA.push_back(std::move(event)); };
         firstCallbacks.onReceiverReport = [&](auto event) { reportsAtA.push_back(std::move(event)); };
+        firstCallbacks.onTargetTransferRate = [&](auto event) { targetsAtA.push_back(std::move(event)); };
+        firstCallbacks.onRemoteBitrateReport = [&](auto event) { rembAtA.push_back(std::move(event)); };
         secondCallbacks.onData = [&](Bytes bytes) { receivedB.push_back(std::move(bytes)); };
         secondCallbacks.onRtpPacket = [&](auto packet) { CHECK(packet.type == IcePacketType::Rtp); rtpAtB.push_back(std::move(packet.datagram.payload)); };
         secondCallbacks.onRtcpPacket = [&](auto packet) { CHECK(packet.type == IcePacketType::Rtcp); rtcpAtB.push_back(std::move(packet.datagram.payload)); };
@@ -100,7 +106,7 @@ struct Link
             {
                 if (failNextRtpAtA && classifyIcePacket(bytes) == IcePacketType::Rtp)
                 { failNextRtpAtA = false; done(net::error::network_unreachable, 0); return; }
-                if (holdMedia)
+                if (holdMedia && (!holdRtpOnly || classifyIcePacket(bytes) == IcePacketType::Rtp))
                 {
                     if (deliverHeldMedia) b->handlePacket(packet(std::move(bytes), first, a->snapshot().generation));
                     heldMedia.push_back(std::move(done)); return;
@@ -543,6 +549,134 @@ void pacingRestartAndLateCompletion()
     CHECK(rtpTransportSequence(link.rtpAtB[0], 5) == 0 && link.a->snapshot().pacer->releasedPackets == 1);
     link.close();
 }
+void gccEndToEnd()
+{
+    auto cfg = pacedConfig(); cfg.congestionControl.padding_ssrc = 0xabcdef;
+    cfg.rtcp.reportInterval = 50ms;
+    Link link(cfg, cfg, true); link.start(); link.connected();
+    CHECK(link.a->snapshot().congestionControl->active && !link.targetsAtA.empty());
+    CHECK(link.a->snapshot().pacer->rateBps == 750000); // 300 kbit/s initial estimate, 2.5x initial pacing.
+    bool manualRejected = false;
+    link.a->setPacingRate(64000, [&](auto ec) { CHECK(ec == net::error::operation_not_supported); manualRejected = true; });
+    unsigned sent = 0;
+    // Keep an existing MID alongside the negotiated TWCC extension in generated padding.
+    auto media = pacedRtp(100); CHECK(setRtpTransportSequence(media, 3, 0x7600));
+    link.a->asyncSendRtp(media, [&](auto ec, auto n) { CHECK(!ec && n == media.size()); ++sent; });
+    until(link.io, [&] {
+        const auto& cc = link.a->snapshot().congestionControl;
+        return sent == 1 && manualRejected && cc->padding_packets > 0 && cc->feedback_packets > 0 && !cc->probing;
+    });
+    bool probeFeedback = false; unsigned mediaCount = 0, paddingCount = 0; std::uint16_t paddingSeq = 0, twccSeq = 0;
+    for (const auto& bytes : link.rtpAtB)
+    {
+        RtpPacketParser r(bytes.data(), bytes.size()); CHECK(r.valid());
+        CHECK(rtpTransportSequence(bytes, 5) == twccSeq++);
+        if (r.payloadSize()) { CHECK(r.sequenceNumber() == 100 && r.ssrc() == 42); ++mediaCount; }
+        else
+        {
+            CHECK(r.padding() && r.ssrc() == cfg.congestionControl.padding_ssrc && r.sequenceNumber() == paddingSeq++);
+            CHECK(rtpTransportSequence(bytes, 3) == 0x7600); ++paddingCount;
+        }
+    }
+    for (const auto& f : link.transportAtA) for (const auto& p : f.packet_feedbacks)
+        probeFeedback = probeFeedback || p.sent_packet.pacing_info.probe_cluster_id >= 0;
+    CHECK(mediaCount == 1 && paddingCount > 0 && probeFeedback);
+    CHECK(link.a->snapshot().congestionControl->probe_packets > 0 && link.errors == 0);
+    // Receiver bitrate caps and runtime constraints reach both the encoder callback and the Pacer.
+    bool rembSent = false;
+    link.b->asyncSendRtcp(buildRtcpRemb({123, 100000, {42}}), [&](auto ec, auto) { CHECK(!ec); rembSent = true; });
+    until(link.io, [&] { return rembSent && !link.rembAtA.empty() && link.a->snapshot().congestionControl->target->target_rate <= 100000; });
+    TargetRateConstraints limits; limits.min_data_rate = 30000; limits.max_data_rate = 80000;
+    bool limited = false; link.a->setBitrateConstraints(limits, [&](auto ec) { CHECK(!ec); limited = true; });
+    until(link.io, [&] { return limited && link.a->snapshot().congestionControl->target->target_rate <= 80000; });
+    const auto rate = link.a->snapshot().congestionControl->target->target_rate;
+    CHECK(link.a->snapshot().pacer->rateBps >= rate && link.a->snapshot().pacer->rateBps <= rate * 2);
+    StreamsConfig streams; streams.max_padding_rate = 40000;
+    bool configured = false; link.a->setStreamsConfig(streams, [&](auto ec) { CHECK(!ec); configured = true; });
+    until(link.io, [&] { return configured && link.a->snapshot().pacer->paddingRateBps > 0; });
+    const auto before = link.a->snapshot().congestionControl->padding_packets;
+    until(link.io, [&] { return link.a->snapshot().congestionControl->padding_packets >= before + 3; });
+    bool paused = false; link.a->setPacingPaused(true, [&](auto ec) { CHECK(!ec); paused = true; }); until(link.io, [&] { return paused; });
+    const auto atPause = link.rtpAtB.size(); runFor(link.io, 60ms); CHECK(link.rtpAtB.size() == atPause);
+    const auto ticks = link.a->snapshot().congestionControl->process_ticks; CHECK(ticks > 0);
+    streams.max_padding_rate = 0;
+    configured = false; link.a->setStreamsConfig(streams, [&](auto ec) { CHECK(!ec); configured = true; });
+    until(link.io, [&] { return configured; }); CHECK(link.a->snapshot().pacer->queuedPackets == 0);
+    IceTransport::Snapshot ice; ice.state = IceTransportState::Disconnected;
+    link.a->handleIceState(ice);
+    until(link.io, [&] { return !link.a->snapshot().congestionControl->network_available; });
+    CHECK(link.a->snapshot().pacer->congested);
+    paused = false; link.a->setPacingPaused(false, [&](auto ec) { CHECK(!ec); paused = true; }); until(link.io, [&] { return paused; });
+    runFor(link.io, 20ms); CHECK(link.rtpAtB.size() == atPause);
+    ice.state = IceTransportState::Connected; link.a->handleIceState(ice);
+    until(link.io, [&] { return link.a->snapshot().congestionControl->network_available && !link.a->snapshot().pacer->congested; });
+    link.close(); CHECK(!link.a->snapshot().congestionControl->active);
+    const auto closedTicks = link.a->snapshot().congestionControl->process_ticks;
+    runFor(link.io, 40ms); CHECK(link.a->snapshot().congestionControl->process_ticks == closedTicks);
+}
+void gccRestartAndFallback()
+{
+    auto cfg = pacedConfig(); cfg.congestionControl.generate_padding = false;
+    Link link(cfg, cfg, true); link.start(); link.connected(); link.holdMedia = true;
+    bool cancelled = false;
+    link.a->asyncSendRtp(pacedRtp(1), [&](auto ec, auto n) { CHECK(ec == net::error::operation_aborted && n == 0); cancelled = true; });
+    until(link.io, [&] { return link.heldMedia.size() == 1; });
+    unsigned reset = 0; link.a->reset(1, [&](auto ec) { CHECK(!ec); ++reset; }); link.b->reset(1, [&](auto ec) { CHECK(!ec); ++reset; });
+    until(link.io, [&] { return reset == 2 && cancelled; });
+    CHECK(link.a->snapshot().congestionControl->generation == 1 && link.a->snapshot().congestionControl->sent_packets == 0);
+    link.heldMedia[0]({}, 200); runFor(link.io, 5ms);
+    CHECK(link.a->snapshot().congestionControl->sent_packets == 0);
+    link.holdMedia = false; link.start({}, {}, 1); link.connected();
+    bool sent = false; link.a->asyncSendRtp(pacedRtp(1), [&](auto ec, auto) { CHECK(!ec); sent = true; });
+    until(link.io, [&] { return sent && link.a->snapshot().congestionControl->feedback_packets == 1; });
+    CHECK(link.targetsAtA.back().generation == 1 && link.a->snapshot().congestionControl->sent_packets == 1);
+    link.close();
+
+    // RTP without negotiated transport-cc still runs GCC's periodic RR/RTT/REMB fallback, without probes.
+    cfg = pacedConfig(); cfg.rtcp.parameters.media[0].transportCc = cfg.rtcp.parameters.media[1].transportCc = false;
+    Link fallback(cfg, cfg, true); fallback.start(); fallback.connected();
+    CHECK(fallback.a->snapshot().congestionControl->active && fallback.a->snapshot().congestionControl->pending_probe_clusters == 0);
+    sent = false; fallback.a->asyncSendRtp(pacedRtp(1), [&](auto ec, auto) { CHECK(!ec); sent = true; });
+    until(fallback.io, [&] { return sent && fallback.a->snapshot().congestionControl->process_ticks > 1; });
+    CHECK(fallback.a->snapshot().congestionControl->sent_packets == 1 && fallback.rtpAtB.size() == 1);
+    CHECK(fallback.a->snapshot().congestionControl->feedback_packets == 0);
+    fallback.close();
+}
+void gccOutstandingData()
+{
+    auto cfg = pacedConfig(); cfg.congestionControl.generate_padding = false;
+    cfg.congestionControl.make_algorithm_config = [] {
+        GoogCcConfig config; config.use_congestion_window_pushback = false;
+        config.congestion_window_additional_time = 0us; return config;
+    };
+    Link link(cfg, cfg, true); link.start(); link.connected();
+    link.holdMedia = link.deliverHeldMedia = link.holdRtpOnly = true;
+    unsigned sent = 0;
+    link.a->asyncSendRtp(pacedRtp(1), [&](auto ec, auto) { CHECK(!ec); ++sent; });
+    until(link.io, [&] { return !link.transportAtA.empty() && link.heldMedia.size() == 1; });
+    CHECK(sent == 0 && link.a->snapshot().congestionControl->feedback_packets == 1 && link.a->snapshot().rtcp->transport.data_in_flight == 0);
+    link.heldMedia[0]({}, 200); link.heldMedia.clear(); until(link.io, [&] { return sent == 1; });
+    CHECK(link.a->snapshot().congestionControl->sent_packets == 1); // No duplicate submission on completion.
+    until(link.io, [&] { return !link.a->snapshot().congestionControl->probing; });
+    link.deliverHeldMedia = false;
+    unsigned failed = 0;
+    for (unsigned i = 2; i < 62; ++i)
+        link.a->asyncSendRtp(pacedRtp(i), [&](auto ec, auto n) { CHECK(ec && n == 0); ++failed; });
+    until(link.io, [&] { return link.a->snapshot().pacer->congested; });
+    const auto blocked = link.heldMedia.size(); CHECK(blocked > 0 && link.a->snapshot().pacer->queuedPackets > 0);
+    bool control = false;
+    link.a->asyncSendRtcp({0x80, 201, 0, 1, 0, 0, 3, 9}, [&](auto ec, auto) { CHECK(!ec); control = true; });
+    until(link.io, [&] { return control; }); CHECK(link.heldMedia.size() == blocked); // RTCP bypasses the window.
+    // A local send failure releases adapter outstanding data and permits the next queued packet.
+    auto done = std::move(link.heldMedia[0]); done(net::error::network_unreachable, 0);
+    until(link.io, [&] { return failed == 1 && link.heldMedia.size() > blocked; });
+    CHECK(link.a->snapshot().rtcp->transport.failed_sends == 1);
+    unsigned closed = 0;
+    link.a->close([&](auto ec) { CHECK(!ec); ++closed; }); link.b->close([&](auto ec) { CHECK(!ec); ++closed; });
+    runFor(link.io, 5ms);
+    for (std::size_t i = 1; i < link.heldMedia.size(); ++i) link.heldMedia[i](net::error::operation_aborted, 0);
+    until(link.io, [&] { return closed == 2 && failed == 60; });
+}
 void mediaConfigurationAndFailure()
 {
     DtlsTransport::Config bad; bad.enableSrtp = true; bad.srtp.component = 2;
@@ -670,6 +804,7 @@ int main()
         for (auto profile : {DtlsSrtpProfile::AeadAes128Gcm, DtlsSrtpProfile::AeadAes256Gcm, DtlsSrtpProfile::Aes128CmSha1_80, DtlsSrtpProfile::Aes128CmSha1_32}) managedMedia(profile);
         managedFeedback(DtlsSrtpProfile::AeadAes128Gcm); managedFeedback(DtlsSrtpProfile::Aes128CmSha1_80);
         pacingAndTimestamps(); pacingExpiryAndBounds(); pacingPaddingBudgets(); transportAdapterSubmission(); pacingRestartAndLateCompletion();
+        gccEndToEnd(); gccRestartAndFallback(); gccOutstandingData();
         mediaConfigurationAndFailure(); mediaQueueLimits();
         std::cout << "PASS: DTLS certificates, fingerprints, handshakes, retransmission, data, SRTP keys and real ICE\n";
         return 0;
