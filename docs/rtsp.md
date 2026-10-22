@@ -1,6 +1,10 @@
 # RTSP 拉流模块
 
-实现位于 `src/rtsp/`，每个媒体源提供一路 H.264 视频，客户端可直接通过 RTSP 连接服务器。默认端口为 8554；支持 TCP interleaved 与 UDP unicast，以及 OPTIONS、DESCRIBE、SETUP、PLAY、PAUSE、TEARDOWN 和 GET_PARAMETER。此文档描述模块接口，不表示主程序已经接入硬件编码器。
+板端实时编码入口为 `uav_detection --encode`，默认地址 `rtsp://设备地址:8554/live/rgb`。`LiveRtpSource` 连接共享的 RTSP 稳定码率编码实例，不按客户端数创建编码器；配置及生命周期见 [三路编码与媒体订阅](media-encoding.md)。
+
+同时发布 `rgb.main`（2566×1520，`/live/rgb`）、`rgb.sub`（1920×1080，`/live/rgb/sub`）、`thermal.main`（640×512，`/live/thermal`），共享 8554 监听端口，每源使用独立编码器。
+
+实现位于 `src/rtsp/`，每个媒体源提供一路 H.264 视频，客户端可直接通过 RTSP 连接服务器。默认端口为 8554；支持 TCP interleaved 与 UDP unicast，以及 OPTIONS、DESCRIBE、SETUP、PLAY、PAUSE、TEARDOWN 和 GET_PARAMETER。以下描述模块接口；板端可通过上述 `--encode` 入口接入硬件编码器。
 
 ## 接入
 

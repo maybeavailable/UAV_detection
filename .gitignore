@@ -16,3 +16,7 @@ tools/
 
 bin/
 lib/
+
+# Vue 前端依赖及静态构建产物
+www/node_modules/
+www/dist/

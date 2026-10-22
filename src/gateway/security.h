@@ -28,6 +28,8 @@ public:
     SecurityReply grant(const Principal &, const std::string &stream, const std::string &protocol);
     SecurityReply playback(const Principal &, const std::string &id, bool remove, bool renew);
     bool validate(const std::string &token, const std::string &stream, const std::string &protocol) const;
+    std::optional<std::string> grantId(const std::string &token, const std::string &stream, const std::string &protocol) const;
+    bool validateGrant(const std::string &id, const std::string &stream, const std::string &protocol) const;
     void expire();
     void clear();
 private:

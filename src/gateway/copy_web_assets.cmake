@@ -1,0 +1,6 @@
+if(EXISTS "${UAV_WEB_SOURCE}/index.html")
+  file(MAKE_DIRECTORY "${UAV_WEB_DEST}")
+  file(COPY "${UAV_WEB_SOURCE}/" DESTINATION "${UAV_WEB_DEST}")
+else()
+  message(STATUS "网页尚未构建：在 www 运行 npm ci && npm run build；当前仅提供 Gateway API")
+endif()

@@ -4,6 +4,7 @@
 #include <boost/json.hpp>
 #include <csignal>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -46,18 +47,69 @@ std::size_t setting(const char *name, std::size_t fallback, std::size_t maximum)
     if (number == 0 || number > maximum) throw std::invalid_argument(std::string("out of range: ") + name);
     return number;
 }
+
+std::string findSettingsFile()
+{
+    namespace fs = std::filesystem;
+    std::vector<fs::path> candidates{fs::current_path() / "config" / "gateway.json"};
+    std::error_code error;
+    const auto executable = fs::read_symlink("/proc/self/exe", error);
+    if (!error)
+    {
+        const auto directory = executable.parent_path();
+        candidates.push_back(directory / "config" / "gateway.json");
+        candidates.push_back(directory / ".." / "config" / "gateway.json");
+        candidates.push_back(directory / ".." / "etc" / "uav-gateway" / "gateway.json");
+    }
+    for (const auto &candidate : candidates)
+        if (fs::exists(candidate)) return fs::absolute(candidate).lexically_normal().string();
+    return {};
+}
+
+void readSettings(Config &config, const std::string &path)
+{
+    boost::json::object root;
+    try { root = detail::readRegistryFile(path); }
+    catch (const std::exception &)
+    { throw std::invalid_argument("cannot read or parse Gateway configuration: " + path); }
+    for (const auto &entry : root)
+        if (entry.key() != "admin_token" && entry.key() != "viewer_token" &&
+            entry.key() != "bind_address" && entry.key() != "port")
+            throw std::invalid_argument("unsupported Gateway configuration field; use admin_token, viewer_token, bind_address or port");
+    auto stringSetting = [&](const char *name, std::string &output) {
+        if (const auto *value = root.if_contains(name))
+        {
+            if (!value->is_string()) throw std::invalid_argument(std::string("Gateway configuration ") + name + " must be a string");
+            output = textOf(*value);
+        }
+    };
+    stringSetting("admin_token", config.adminToken);
+    stringSetting("viewer_token", config.viewerToken);
+    stringSetting("bind_address", config.bindAddress);
+    if (const auto *port = root.if_contains("port"))
+    {
+        if ((!port->is_int64() && !port->is_uint64()) ||
+            (port->is_int64() && port->as_int64() < 0) ||
+            (port->is_int64() ? static_cast<std::uint64_t>(port->as_int64()) : port->as_uint64()) > 65535)
+            throw std::invalid_argument("Gateway configuration port must be an integer in 0..65535");
+        config.port = static_cast<std::uint16_t>(port->is_int64() ? port->as_int64() : port->as_uint64());
+    }
+    config.settingsFile = std::filesystem::absolute(path).lexically_normal().string();
+}
 } // namespace
 
-Config configFromEnvironment()
+Config loadConfig(const std::string &path)
 {
     Config config;
-    config.adminToken = env("UAV_GATEWAY_TOKEN");
-    config.viewerToken = env("UAV_GATEWAY_VIEW_TOKEN");
+    const auto settings = path.empty() ? findSettingsFile() : path;
+    if (!settings.empty()) readSettings(config, settings);
+    if (std::getenv("UAV_GATEWAY_TOKEN")) config.adminToken = env("UAV_GATEWAY_TOKEN");
+    if (std::getenv("UAV_GATEWAY_VIEW_TOKEN")) config.viewerToken = env("UAV_GATEWAY_VIEW_TOKEN");
     if (auto bind = env("UAV_GATEWAY_BIND"); !bind.empty()) config.bindAddress = bind;
     if (auto port = env("UAV_GATEWAY_PORT"); !port.empty()) config.port = parsePort(port);
     if (auto origin = env("UAV_GATEWAY_ORIGIN"); !origin.empty()) config.allowedOrigins.push_back(origin);
     config.stateFile = std::getenv("UAV_GATEWAY_STATE") ? env("UAV_GATEWAY_STATE") : "data/gateway-state.json";
-    config.webRoot = env("UAV_GATEWAY_WEB_ROOT");
+    config.webRoot = std::getenv("UAV_GATEWAY_WEB_ROOT") ? env("UAV_GATEWAY_WEB_ROOT") : detail::findWebRoot();
     config.tlsCertificate = env("UAV_GATEWAY_TLS_CERT");
     config.tlsPrivateKey = env("UAV_GATEWAY_TLS_KEY");
     config.mediaServiceToken = env("UAV_GATEWAY_MEDIA_TOKEN");
@@ -109,27 +161,36 @@ int runStandalone(int argc, char **argv)
 {
     try
     {
-        Config config = configFromEnvironment();
+        std::string settings;
+        std::vector<std::pair<std::string, std::string>> overrides;
         std::string registry = env("UAV_GATEWAY_CONFIG");
         for (int i = 1; i < argc; ++i)
         {
             const std::string arg = argv[i];
             if (arg == "--help")
             {
-                std::cout << "Usage: uav_gateway [--bind ADDRESS] [--port PORT] [--config FILE]\n"
+                std::cout << "Usage: uav_gateway [--gateway-config FILE] [--bind ADDRESS] [--port PORT] [--config FILE]\n"
                              "  [--state-file FILE] [--web-root DIRECTORY] [--tls-cert FILE --tls-key FILE]\n"
-                             "Set UAV_GATEWAY_TOKEN; optional UAV_GATEWAY_VIEW_TOKEN, UAV_GATEWAY_ORIGIN.\n";
+                             "Reads config/gateway.json automatically (admin_token, viewer_token, bind_address, port).\n"
+                             "Environment variables override file settings; CLI options override environment variables.\n";
                 return 0;
             }
             if (i + 1 >= argc) throw std::invalid_argument("missing option value");
-            if (arg == "--bind") config.bindAddress = argv[++i];
-            else if (arg == "--port") config.port = parsePort(argv[++i]);
+            if (arg == "--gateway-config") settings = argv[++i];
             else if (arg == "--config") registry = argv[++i];
-            else if (arg == "--state-file") config.stateFile = argv[++i];
-            else if (arg == "--web-root") config.webRoot = argv[++i];
-            else if (arg == "--tls-cert") config.tlsCertificate = argv[++i];
-            else if (arg == "--tls-key") config.tlsPrivateKey = argv[++i];
+            else if (arg == "--bind" || arg == "--port" || arg == "--state-file" || arg == "--web-root" ||
+                     arg == "--tls-cert" || arg == "--tls-key") overrides.emplace_back(arg, argv[++i]);
             else throw std::invalid_argument("unknown gateway option");
+        }
+        Config config = loadConfig(settings);
+        for (const auto &option : overrides)
+        {
+            if (option.first == "--bind") config.bindAddress = option.second;
+            else if (option.first == "--port") config.port = parsePort(option.second);
+            else if (option.first == "--state-file") config.stateFile = option.second;
+            else if (option.first == "--web-root") config.webRoot = option.second;
+            else if (option.first == "--tls-cert") config.tlsCertificate = option.second;
+            else if (option.first == "--tls-key") config.tlsPrivateKey = option.second;
         }
         Gateway gateway(std::move(config));
         loadRegistry(gateway, registry);

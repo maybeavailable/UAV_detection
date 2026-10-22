@@ -1,6 +1,8 @@
 # Gateway 后端与网页托管
 
-Gateway 提供网页/API 接入、HTTP/HTTPS、WebSocket/WSS、登录会话与权限、设备/码流配置持久化、异步控制命令和播放授权。网页静态资源使用同一端口托管。本次不包含前端控制台。
+Gateway 提供网页/API 接入、HTTP/HTTPS、WebSocket/WSS、登录会话与权限、设备/码流配置持久化、异步控制命令和播放授权。网页静态资源使用同一端口托管。前端控制台位于 `www`，使用 Vue 3、TypeScript 和 Vite。开发与部署见 [前端说明](../www/DEVELOPMENT.md)。
+
+板端 `uav_detection --encode` 同时启用 Gateway 时，已接入 WebRTC 实时视频，控制台入口为 `/` 或 `/webrtc`。采集/编码、信令接口和播放方式见 [WebRTC 实时视频](webrtc-live.md)。独立 Gateway 仍须应用注入真实媒体适配器。
 
 GB28181 和 ONVIF 是并列的原生协议入口，不经过 Gateway，也不使用 Gateway Token。国标自行 SIP 注册、查询与点播；ONVIF 自行发现并处理 SOAP 服务请求。当前国标模块尚未在主程序启动，ONVIF 尚待实现，详见 [整体架构](architecture.md)。
 
@@ -9,19 +11,36 @@ GB28181 和 ONVIF 是并列的原生协议入口，不经过 Gateway，也不使
 Gateway 使用 C++17、仓库的 Boost 头文件、OpenSSL 和系统线程库。本机独立构建不依赖 Ascend、SIP 或 libxml2；交叉编译使用仓库的目标架构 OpenSSL。
 
 ```bash
+(cd www && npm ci && npm run build)
 cmake --preset gateway-native
 cmake --build --preset gateway-native -j2
 ctest --preset gateway-native
 
-export UAV_GATEWAY_TOKEN='<管理员接入令牌>'
-export UAV_GATEWAY_VIEW_TOKEN='<可选的只读接入令牌，须与管理员不同>'
+# 先在 config/gateway.json 中填写 admin_token，程序启动时自动读取。
 ./build/gateway-native/bin/uav_gateway \
   --config config/gateway.example.json \
   --state-file data/gateway-state.json \
-  --web-root /path/to/frontend/dist
+  --web-root www/dist
 ```
 
-没有前端资源时省略 `--web-root`，根路径返回服务说明。默认监听 `127.0.0.1:8080`，通过 `--bind 0.0.0.0 --port 8080` 在局域网接口监听。未设置管理员令牌时拒绝启动，凭据不通过命令行参数或日志输出。
+未指定网页目录时，自动查找工作目录中的 `www/dist`、可执行文件旁或上一级的 `www`、安装目录 `share/uav-gateway/www`。CMake 构建会同步已有的 `www/dist` 到构建目录 `www/`；先构建前端再构建 C++。找不到页面时根路径返回服务说明，`/webrtc` 返回 503。显式设置 `UAV_GATEWAY_WEB_ROOT=` 可禁用托管。监听地址与端口由 `config/gateway.json` 配置，也可通过 `--bind` / `--port` 临时覆盖。未设置管理员令牌时拒绝启动，凭据不通过命令行参数或日志输出。
+
+启动配置文件 `config/gateway.json`：
+
+```json
+{
+  "admin_token": "<接入凭据>",
+  "viewer_token": "",
+  "bind_address": "0.0.0.0",
+  "port": 8080
+}
+```
+
+仓库中的 `admin_token` 初始为空，填入实际凭据后即可启用 Gateway，无需再 export 接入凭据或监听地址；可选的 `viewer_token` 必须与管理员不同。主程序直接运行 `./build/ascend-aarch64/bin/uav_detection --encode`。需要指定其他配置文件时，使用 `--gateway-config /path/to/gateway.json`，主程序、独立 `uav_gateway` 和 `--gateway-only` 均支持。
+
+自动查找顺序为：工作目录的 `config/gateway.json`、可执行文件旁的 `config/gateway.json`、可执行文件上一级的 `config/gateway.json`、安装目录的 `etc/uav-gateway/gateway.json`。读取第一个存在的文件；显式指定的文件缺失、JSON 无效或字段类型不符会报错，不会忽略错误后改用默认凭据。没有文件时保留原环境变量方式。启动配置与 `--config` 的设备/码流目录是两个不同文件，启动配置不会写入持久化设备状态，也不能放在网页根目录中。
+
+优先级为：命令行监听选项 > 对应环境变量 > 启动配置文件 > 内置默认值。内置默认监听 `127.0.0.1:8080`，仓库提供的配置文件设为 `0.0.0.0:8080`。配置文件中的端口允许 0，表示自动分配端口。
 
 HTTPS/WSS 使用同一监听端口，配置证书链与未加密的 PEM 私钥：
 
@@ -40,16 +59,16 @@ TLS 最低版本为 1.2。证书与私钥必须同时配置并匹配；加载错
 cmake --install build/gateway-native --prefix /opt/uav-gateway
 ```
 
-安装产物包括 `bin/uav_gateway` 和 `share/uav-gateway/openapi.json`。接口文档也可直接从公开路径 `/openapi.json` 获取。
+安装产物包括 `bin/uav_gateway`、`share/uav-gateway/openapi.json`，已构建的 `share/uav-gateway/www` 静态资源，以及 `etc/uav-gateway/gateway.json` 启动配置。构建目录也会提供 `config/gateway.json`；重新配置和安装均保留已经存在的配置文件。手工部署时一起复制 `bin/`、`www/`、`config/`。接口文档也可直接从公开路径 `/openapi.json` 获取。
 
 | 环境变量 | 用途 |
 | --- | --- |
-| UAV_GATEWAY_TOKEN | 管理员接入令牌，必须非空 |
-| UAV_GATEWAY_VIEW_TOKEN | 可选的只读接入令牌 |
-| UAV_GATEWAY_BIND / UAV_GATEWAY_PORT | 监听地址与端口；端口 0 自动分配 |
+| UAV_GATEWAY_TOKEN | 覆盖文件中的 admin_token；启用 Gateway 时必须非空 |
+| UAV_GATEWAY_VIEW_TOKEN | 覆盖文件中的 viewer_token，可选 |
+| UAV_GATEWAY_BIND / UAV_GATEWAY_PORT | 覆盖文件中的 bind_address / port；端口 0 自动分配 |
 | UAV_GATEWAY_CONFIG | 初次启动的设备/码流目录文件 |
 | UAV_GATEWAY_STATE | 持久化文件，默认 data/gateway-state.json；显式设为空禁用持久化 |
-| UAV_GATEWAY_WEB_ROOT | 构建后的网页目录；留空不托管网页 |
+| UAV_GATEWAY_WEB_ROOT | 构建后的网页目录；未设置时自动查找，显式设为空禁用托管 |
 | UAV_GATEWAY_TLS_CERT / UAV_GATEWAY_TLS_KEY | TLS 证书链与私钥路径 |
 | UAV_GATEWAY_ORIGIN | 允许的浏览器来源，例如 https://console.example.com；默认只允许同源 |
 | UAV_GATEWAY_MEDIA_TOKEN | 独立媒体进程调用播放授权校验接口的服务凭据，须与用户令牌不同 |
@@ -59,7 +78,7 @@ cmake --install build/gateway-native --prefix /opt/uav-gateway
 
 CLI 的 bind、port、config、state-file、web-root、tls-cert、tls-key 覆盖对应环境变量。单独使用 C++ Gateway 时，Config.stateFile 默认为空，应用可明确选择存储路径。
 
-板端使用 `cmake --preset ascend-aarch64` 与 `cmake --build --preset ascend-aarch64` 构建。设置管理员令牌后，正常运行 uav_detection 会同时启动 Gateway、登记真实 RGB 控制适配器，并上报 RGB 和热成像的采集统计。热成像在该入口只提供状态。双相机出图测试可通过 `--duration 15` 定时结束，详见 [测试说明](camera-capture-test.md)。Gateway 配置错误或绑定失败时记录错误并继续采集。独立 uav_gateway 启动失败仍返回非零退出码。
+板端使用 `cmake --preset ascend-aarch64` 与 `cmake --build --preset ascend-aarch64` 构建。在启动配置文件中填写管理员令牌后，正常运行 uav_detection 会同时启动 Gateway、登记真实 RGB 控制适配器，并上报 RGB 和热成像的采集统计。热成像在该入口只提供状态。双相机出图测试可通过 `--duration 15` 定时结束，详见 [测试说明](camera-capture-test.md)。Gateway 配置错误或绑定失败时记录错误并继续采集。独立 uav_gateway 启动失败仍返回非零退出码。
 
 ```bash
 # 板端：相机采集与 Gateway 一起运行
@@ -136,6 +155,9 @@ viewer 可读取设备状态与能力、提交播放请求、管理自己创建�
 | GET /api/v1/playback/{id} | 所有者/管理员 | 查看授权元数据，不重复返回媒体凭据 |
 | POST /api/v1/playback/{id}/renew | 所有者/管理员 | 延长授权并轮换媒体凭据，旧凭据失效 |
 | DELETE /api/v1/playback/{id} | 所有者/管理员 | 撤销播放授权 |
+| GET /webrtc | 公开页面 | 静态控制台 index.html 的别名，播放时仍需凭据；缺少页面构建时 503 |
+| POST /api/v1/webrtc/{stream_id} | 对应 WebRTC 媒体凭据 | 完整 SDP Offer 换 Answer，201 返回媒体会话 ID；占用默认单路视频名额 |
+| DELETE /api/v1/webrtc/{stream_id}/{session_id} | 创建会话的播放授权 | 关闭媒体会话并释放名额，使用续期后的当前媒体令牌 |
 | POST /api/v1/media/authorize | 媒体服务凭据 | 校验媒体凭据、码流与协议，供独立媒体进程使用 |
 | POST /api/v1/ws-ticket | 只读及以上 | 创建一次性 WebSocket 票据 |
 | GET /api/v1/events?ticket=... | 票据 | WebSocket Upgrade |

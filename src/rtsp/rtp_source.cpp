@@ -88,19 +88,17 @@ RtpSource::RtpSource(int payloadType, std::uint32_t clockRate)
 
 std::uint16_t RtpSource::addSink(const std::shared_ptr<RtpTransport>& sink)
 {
-    std::lock_guard<std::mutex> frameLock(m_frameMutex_);
-    if (!sink)
-        return m_seq_;
-    std::lock_guard<std::mutex> lock(m_sinksMutex_);
-    m_sinks_.erase(std::remove_if(m_sinks_.begin(), m_sinks_.end(),
-        [](const auto& weak) { return weak.expired(); }), m_sinks_.end());
-    for (const auto& weak : m_sinks_)
+    std::uint16_t first;
     {
-        if (weak.lock() == sink)
-            return m_seq_;                // 已订阅
+        std::lock_guard<std::mutex> frameLock(m_frameMutex_);
+        if (!sink) return m_seq_;
+        std::lock_guard<std::mutex> lock(m_sinksMutex_);
+        m_sinks_.erase(std::remove_if(m_sinks_.begin(), m_sinks_.end(), [](const auto& weak) { return weak.expired(); }), m_sinks_.end());
+        for (const auto& weak : m_sinks_) if (weak.lock() == sink) return m_seq_;
+        m_sinks_.emplace_back(sink); first = m_seq_;
     }
-    m_sinks_.emplace_back(sink);
-    return m_seq_;
+    requestKeyFrame(); // Outside frame/sink locks; live encoders apply this asynchronously.
+    return first;
 }
 
 void RtpSource::removeSink(const RtpTransport* sink)

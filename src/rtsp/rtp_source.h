@@ -34,6 +34,7 @@ public:
     // ---- 描述信息（DESCRIBE 回复用）----
     virtual std::string path() const = 0;
     virtual std::string makeSdp(const std::string& host, int port) const = 0;
+    virtual void requestKeyFrame() {} // Live sources merge late-subscriber requests into their encoder.
 
     std::uint32_t ssrc() const { return m_ssrc_; }
     std::uint32_t clockRate() const { return m_clockRate_; }

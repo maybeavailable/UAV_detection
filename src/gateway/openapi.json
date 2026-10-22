@@ -1134,6 +1134,123 @@
           }
         }
       }
+    },
+    "/webrtc": {
+      "get": {
+        "summary": "Static console alias; playback requires credentials",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Built frontend index.html",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/Status503"
+          }
+        }
+      }
+    },
+    "/api/v1/webrtc/{stream_id}": {
+      "post": {
+        "summary": "Create live video session from a complete SDP offer",
+        "description": "Bearer credential must be a media_token issued for this stream and protocol webrtc. Wait for browser ICE gathering to complete. Requires an attached media adapter; default one video subscriber. Response uses the standard envelope with data {type:answer,sdp,session_id}. Session ID differs from the playback grant ID. No PATCH/trickle or same-session renegotiation.",
+        "parameters": [
+          {
+            "name": "stream_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.-]{1,64}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "sdp"
+                ],
+                "properties": {
+                  "sdp": {
+                    "type": "string",
+                    "maxLength": 61440
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "$ref": "#/components/responses/Status201"
+          },
+          "400": {
+            "$ref": "#/components/responses/Status400"
+          },
+          "403": {
+            "$ref": "#/components/responses/Status403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Status409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Status503"
+          },
+          "406": {
+            "description": "Receiving H264 Baseline packetization-mode=1 video required"
+          }
+        }
+      }
+    },
+    "/api/v1/webrtc/{stream_id}/{session_id}": {
+      "delete": {
+        "summary": "Close a live video session and release its subscriber slot",
+        "description": "Uses the current media_token for the playback grant that created this session. Token rotation during renewal preserves the existing session. Revocation or expiry closes the session.",
+        "parameters": [
+          {
+            "name": "stream_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.-]{1,64}$"
+            }
+          },
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.-]{1,64}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/Status200"
+          },
+          "403": {
+            "$ref": "#/components/responses/Status403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Status404"
+          },
+          "503": {
+            "$ref": "#/components/responses/Status503"
+          }
+        }
+      }
     }
   },
   "components": {

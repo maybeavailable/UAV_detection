@@ -227,6 +227,7 @@ struct Gateway::Impl : std::enable_shared_from_this<Gateway::Impl>
     std::condition_variable commandReady;
     std::map<std::string, DeviceEntry> devices;
     std::map<std::string, StreamEntry> streams;
+    std::map<std::string, WebRtcHandler> webRtcHandlers;
     std::map<std::string, json::object> commands;
     std::deque<std::string> commandOrder;
     std::deque<Job> jobs;
@@ -697,7 +698,7 @@ struct Gateway::Impl : std::enable_shared_from_this<Gateway::Impl>
     Reply configure(const Request &request);
     void restoreState();
     json::object registryJson(const std::map<std::string, DeviceEntry> &, const std::map<std::string, StreamEntry> &) const;
-    bool validateMedia(const std::string &token, const std::string &id, const std::string &protocol) const
+    bool mediaEnabled(const std::string &id) const
     {
         if (!running.load()) return false;
         { std::lock_guard<std::mutex> lock(mutex);
@@ -706,8 +707,10 @@ struct Gateway::Impl : std::enable_shared_from_this<Gateway::Impl>
           auto device = devices.find(found->second.stream.deviceId);
           if (device == devices.end() || !device->second.device.enabled) return false;
         }
-        return security.validate(token, id, protocol);
+        return true;
     }
+    bool validateMedia(const std::string &token, const std::string &id, const std::string &protocol) const
+    { return mediaEnabled(id) && security.validate(token, id, protocol); }
 };
 
 json::object Gateway::Impl::registryJson(const std::map<std::string, DeviceEntry> &deviceValues,
@@ -1022,6 +1025,54 @@ private:
             return;
         }
         const std::string target(request.target());
+        if ((target == "/webrtc" || target == "/webrtc/") && server->config.webRoot.empty())
+        {
+            send(response(request, failure(503, "frontend_unavailable", "build www and configure UAV_GATEWAY_WEB_ROOT"))); return;
+        }
+        if (target.rfind("/api/v1/webrtc/", 0) == 0)
+        {
+            // Media credentials, rather than the login/access token, authorize this boundary.
+            const auto tail = target.substr(15); const auto slash = tail.find('/');
+            const auto streamId = tail.substr(0, slash);
+            const auto sessionId = slash == std::string::npos ? std::string{} : tail.substr(slash + 1);
+            if (!identifier(streamId) || (slash != std::string::npos && !identifier(sessionId)))
+            { send(response(request, failure(400, "invalid_request", "invalid stream/session ID"))); return; }
+            const std::string bearer(request[http::field::authorization]);
+            const std::string credential = bearer.rfind("Bearer ", 0) == 0 ? bearer.substr(7) : std::string{};
+            const auto grant = credential.size() <= 4096 ? server->security.grantId(credential, streamId, "webrtc") : std::optional<std::string>{};
+            if (!grant || !server->mediaEnabled(streamId))
+            { send(response(request, failure(403, "media_token_invalid", "valid WebRTC playback permission required"))); return; }
+            if ((sessionId.empty() && request.method() != http::verb::post) || (!sessionId.empty() && request.method() != http::verb::delete_))
+            { send(response(request, failure(405, "method_not_allowed", "POST offer or DELETE session required"))); return; }
+            const auto found = server->webRtcHandlers.find(streamId);
+            if (found == server->webRtcHandlers.end())
+            { send(response(request, failure(503, "stream_unavailable", "WebRTC adapter is not registered"))); return; }
+            try
+            {
+                std::string sdp;
+                if (sessionId.empty()) sdp = stringField(parseBody(request), "sdp");
+                auto input = std::make_shared<Request>(std::move(request));
+                const auto weakServer = std::weak_ptr<Impl>(server);
+                WebRtcRequest operation{sessionId, std::move(sdp), *grant, [weakServer, streamId, grantId = *grant] {
+                    if (auto owner = weakServer.lock()) return owner->mediaEnabled(streamId) && owner->security.validateGrant(grantId, streamId, "webrtc");
+                    return false;
+                }};
+                const auto weak = this->weak_from_this(); auto completed = std::make_shared<std::atomic<bool>>(false);
+                found->second(std::move(operation), [weak, weakServer, input, completed](WebRtcReply value) {
+                    if (completed->exchange(true)) return;
+                    if (auto owner = weakServer.lock()) net::post(owner->io, [weak, input, value = std::move(value)] {
+                        if (auto self = weak.lock(); self && !self->closed)
+                        {
+                            if (value.status >= 400) self->send(response(*input, failure(value.status, value.error, "WebRTC request failed")));
+                            else self->send(response(*input, success(json::object{{"session_id", value.sessionId}, {"type", "answer"}, {"sdp", value.sdp}}, value.status)));
+                        }
+                    });
+                });
+            }
+            catch (const std::invalid_argument&) { send(response(request, failure(400, "invalid_offer", "SDP offer required"))); }
+            catch (...) { send(response(request, failure(503, "stream_unavailable", "WebRTC adapter failed"))); }
+            return;
+        }
         const bool configure = (request.method() == http::verb::put || request.method() == http::verb::delete_) &&
             (target.rfind("/api/v1/devices/", 0) == 0 || target.rfind("/api/v1/streams/", 0) == 0);
         const bool asset = !server->config.webRoot.empty() && target.rfind("/api/", 0) != 0 &&
@@ -1040,7 +1091,9 @@ private:
                         reply = response(*input, failure(405, "method_not_allowed", "assets require GET or HEAD"));
                     else
                     {
-                        auto file = detail::readAsset(server->config.webRoot, std::string(input->target()),
+                        const auto target = std::string(input->target());
+                        const auto page = target.substr(0, target.find('?'));
+                        auto file = detail::readAsset(server->config.webRoot, page == "/webrtc" || page == "/webrtc/" ? "/index.html" : target,
                             (*input)[http::field::accept].find("text/html") != beast::string_view::npos);
                         reply = Response{static_cast<http::status>(file.status), input->version()};
                         reply.keep_alive(input->keep_alive());
@@ -1154,7 +1207,7 @@ void Gateway::Impl::start()
     if (started) throw std::logic_error("Gateway instance can only be started once");
     if (config.adminToken.empty() || config.adminToken.size() > 4096 || config.viewerToken.size() > 4096 ||
         (!config.viewerToken.empty() && config.viewerToken == config.adminToken))
-        throw std::invalid_argument("set a nonempty UAV_GATEWAY_TOKEN; viewer and admin tokens must differ");
+        throw std::invalid_argument("set a nonempty admin_token in config/gateway.json or UAV_GATEWAY_TOKEN; viewer and admin tokens must differ");
     if (config.maxConnections == 0 || config.maxConnections > 1024 || config.maxPendingCommands == 0 || config.maxPendingCommands > kCommandHistory ||
         config.maxDevices == 0 || config.maxDevices > 128 || config.ticketLifetime.count() <= 0 ||
         config.ticketLifetime.count() > 300 || config.accessLifetime.count() <= 0 || config.accessLifetime.count() > 86400 ||
@@ -1170,11 +1223,11 @@ void Gateway::Impl::start()
         auto root = std::filesystem::canonical(config.webRoot);
         if (!std::filesystem::is_directory(root)) throw std::invalid_argument("web root must be a directory");
         config.webRoot = root.string();
-        for (const auto &file : {config.stateFile, config.tlsPrivateKey})
+        for (const auto &file : {config.stateFile, config.tlsPrivateKey, config.settingsFile})
             if (!file.empty())
             {
                 const auto relative = std::filesystem::weakly_canonical(std::filesystem::absolute(file)).lexically_relative(root);
-                if (!relative.empty() && *relative.begin() != "..") throw std::invalid_argument("state file and private key must be outside web root");
+                if (!relative.empty() && *relative.begin() != "..") throw std::invalid_argument("state file, private key and Gateway configuration must be outside web root");
             }
     }
     if (!config.tlsCertificate.empty())
@@ -1302,6 +1355,16 @@ void Gateway::updateDeviceStatus(const std::string &id, json::object status)
     const auto found = m_impl->devices.find(id);
     if (found == m_impl->devices.end()) throw std::invalid_argument("unknown device id");
     found->second.device.status = std::move(status);
+}
+
+void Gateway::registerWebRtc(const std::string& streamId, WebRtcHandler handler)
+{
+    if (m_impl->started) throw std::logic_error("register adapters before starting Gateway");
+    const auto stream = m_impl->streams.find(streamId);
+    if (!handler || stream == m_impl->streams.end() ||
+        std::find(stream->second.stream.protocols.begin(), stream->second.stream.protocols.end(), "webrtc") == stream->second.stream.protocols.end())
+        throw std::invalid_argument("WebRTC requires a registered video stream");
+    if (!m_impl->webRtcHandlers.emplace(streamId, std::move(handler)).second) throw std::invalid_argument("duplicate WebRTC adapter");
 }
 
 bool Gateway::publish(std::string type, json::value data)

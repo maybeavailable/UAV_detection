@@ -17,4 +17,5 @@ boost::json::object readRegistryFile(const std::string &path);
 void writeRegistryFile(const std::string &path, const boost::json::object &value);
 struct Asset { unsigned status; std::string body, contentType; std::string etag{}; };
 Asset readAsset(const std::string &root, const std::string &target, bool htmlFallback);
+std::string findWebRoot(); // Source checkout, staged build, or installed share/uav-gateway/www.
 } // namespace uav::gateway::detail

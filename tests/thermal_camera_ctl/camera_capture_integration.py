@@ -10,7 +10,7 @@ import time
 
 binary = str(Path(sys.argv[1]).resolve())
 samples = {
-    "main_2688x1520.yuv": (2688 * 1520 * 3 // 2, 11),
+    "main_2566x1520.yuv": (2566 * 1520 * 3 // 2, 11),
     "sub_1920x1080.yuv": (1920 * 1080 * 3 // 2, 21),
     "thermal_640x512.yuv": (640 * 512 * 3 // 2, 31),
 }
@@ -52,7 +52,7 @@ def run_case(fault="", expected=None, code=0, arguments=None, block_sample=False
 
 
 run_case()
-rgb_samples = {"main_2688x1520.yuv", "sub_1920x1080.yuv"}
+rgb_samples = {"main_2566x1520.yuv", "sub_1920x1080.yuv"}
 events = run_case("thermal", expected=rgb_samples, code=1)
 assert events.count("get.rgb0") > 20 and events.count("get.rgb1") > 20  # 热成像超时不拖慢 RGB
 run_case("rgb_init", expected={"thermal_640x512.yuv"}, code=1)

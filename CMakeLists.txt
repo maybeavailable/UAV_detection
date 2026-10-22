@@ -285,6 +285,10 @@ if(UAV_ASCEND)
     src/camera/mipi_ctl.cpp          # MIPI/DVPP 采集链路（acl.h + hi_mpi_*/hi_dvpp.h）
     src/camera/rgb_camera_ctl.cpp    # 可见光相机总控（串口控制 + 整条出图链路编排）
     src/camera/thermal_camera_ctl.cpp # 热成像单通道 640x512 采集和串口控制
+    src/encode/venc_encoder.cpp       # 三路编码复用的 CANN VENC 后端
+    src/encode/ascend_video_frame.cpp # 有界 DVPP 原始帧池，跨编码 worker 共享输入
+    src/media/ascend_media_pipeline.cpp # 板端采集→三路编码，按需启动共享 RTSP 服务
+    src/media/ascend_media_device.cpp # RGB 主/子通道与热成像，独立九路 VENC、共享 RTSP 端口
   )
 endif()
 
@@ -295,6 +299,11 @@ set(UAV_SOURCES
   src/log/log.cpp
   src/log/RotateFileWriter.cpp
   src/common/udp_socket.cpp      # 通用 Asio UDP 数据报收发（MoQ / WebRTC）
+  src/media/video_frame.cpp
+  src/media/media_service.cpp    # RTSP/WebRTC/MoQ 三路编码与订阅、码率仲裁
+  src/media/h264_packetizer.cpp
+  src/encode/encoder_session.cpp
+  src/moq/video_source.cpp       # MoQ 媒体订阅与视频预算接口；QUIC 协议栈单独接入
   src/webrtc/ice_candidate.cpp   # ICE 候选 SDP 与优先级
   src/webrtc/sdp.cpp             # WebRTC SDP 会话/媒体描述解析与生成
   src/webrtc/stun_protocol.cpp   # STUN Binding / ICE 属性及完整性校验
@@ -303,6 +312,8 @@ set(UAV_SOURCES
   src/webrtc/dtlstransport.cpp   # DTLS 握手、证书指纹认证、应用数据与 SRTP exporter
   src/webrtc/datachannel.cpp    # SCTP over DTLS、DCEP 和 DataChannel
   src/webrtc/peerconnection.cpp # Offer/Answer 协商、trickle ICE 和 ICE/DTLS 生命周期
+  src/webrtc/video_sender.cpp   # 编码帧→H264/RTP，GCC/PLI→编码控制
+  src/webrtc/video_service.cpp  # Gateway SDP→PeerConnection→共享 WebRTC 编码器
   src/webrtc/srtp_session.cpp   # libsrtp 公共上下文、密钥代次及认证/重放保护
   src/webrtc/srtp_ctl.cpp       # RTP/SRTP 加解密控制
   src/webrtc/srtcp_ctl.cpp      # RTCP/SRTCP 加解密控制
@@ -332,6 +343,7 @@ set(UAV_SOURCES
   src/rtsp/rtp_source.cpp
   src/rtsp/rtp_transport.cpp
   src/rtsp/file_source.cpp
+  src/rtsp/live_source.cpp      # 稳定编码码流，供任意数量 RTSP 客户端共享
   src/rtsp/h264_access_unit.cpp
   src/ptz/ptz_protocol.cpp        # 转台 Pelco-D 及扩展控制协议
   src/camera/shihui_protocol.cpp   # 世辉相机串口控制协议（依赖 common/urt.h）
@@ -372,6 +384,7 @@ if(UAV_ASCEND)
   # main.cpp 用这个宏决定要不要编采集链路：它依赖海思头文件，而 main.cpp 在公共
   # UAV_SOURCES 里（UAV_ASCEND=OFF 的构建也会编它），所以必须靠宏隔离，否则编不过。
   target_compile_definitions(uav_detection PRIVATE UAV_HAS_ASCEND=1)
+  target_compile_definitions(uav_detection PRIVATE UAV_HAS_MEDIA_SERVICE=1)
 
   # ACL 运行时 + DVPP/媒体 MPI 库（Ascend::ascend_media = libascendcl + libacl_dvpp[_mpi]
   # + libacl_vi_mpi + libacl_vpss_mpi + libacl_vo_mpi + libacl_hdmi_mpi + libacl_isp_* 等，

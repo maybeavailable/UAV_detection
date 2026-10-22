@@ -20,7 +20,7 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 
 | 输出 | 链路 | 尺寸 | 当前目录下的样帧 | 字节数 |
 | --- | --- | --- | --- | --- |
-| 可见光主通道 | MIPI dev0 / VI pipe2 / VPSS grp256 chn0 | 2688×1520 | `main_2688x1520.yuv` | 6128640 |
+| 可见光主通道 | MIPI dev0 / VI pipe2 / VPSS grp256 chn0 | 2566×1520 | `main_2566x1520.yuv` | 5850480 |
 | 可见光子通道 | 同上，VPSS chn1 | 1920×1080 | `sub_1920x1080.yuv` | 3110400 |
 | 热成像 | MIPI dev2，lane4/5 / VI pipe3 / VPSS grp257 chn0 | 640×512 | `thermal_640x512.yuv` | 491520 |
 
@@ -29,7 +29,7 @@ source /usr/local/Ascend/ascend-toolkit/set_env.sh
 样帧在 `getFrame()` 的回调内同步保存，逐行去除 stride 填充，然后才归还硬件缓冲区。每路只尝试保存一张有效帧；保存失败会记录错误，采集继续，最终测试判为失败。文件会覆盖同名旧样帧，判断本次结果应以日志中的保存结果和退出码为准。
 
 ```sh
-ffplay -f rawvideo -pixel_format nv21 -video_size 2688x1520 main_2688x1520.yuv
+ffplay -f rawvideo -pixel_format nv21 -video_size 2566x1520 main_2566x1520.yuv
 ffplay -f rawvideo -pixel_format nv21 -video_size 1920x1080 sub_1920x1080.yuv
 ffplay -f rawvideo -pixel_format nv21 -video_size 640x512 thermal_640x512.yuv
 ```
@@ -38,7 +38,7 @@ ffplay -f rawvideo -pixel_format nv21 -video_size 640x512 thermal_640x512.yuv
 
 一路初始化失败时，程序继续验证另一台相机。未指定时长时需要手动结束；两台都无法初始化时直接返回失败。初始化成功仅说明链路已建立，是否出图由实际帧和样帧验证。
 
-设置 `UAV_GATEWAY_TOKEN` 时仍可启用 Gateway。设备列表包含 RGB 和热成像的采集状态；热成像在这个测试入口只上报状态，可见光保留原有控制动作。`--gateway-only` 继续作为独立 Gateway 的入口。
+在 `config/gateway.json` 填写 `admin_token` 后可启用 Gateway，启动时自动读取；也可用 `--gateway-config` 指定文件。设备列表包含 RGB 和热成像的采集状态；热成像在这个测试入口只上报状态，可见光保留原有控制动作。`--gateway-only` 继续作为独立 Gateway 的入口。
 
 ## 主机回归测试
 

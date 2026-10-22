@@ -163,12 +163,20 @@ SecurityReply Security::playback(const Principal &principal, const std::string &
     return {200, grantJson(id, found->second, renew), {}};
 }
 bool Security::validate(const std::string &token, const std::string &stream, const std::string &protocol) const
+{ return grantId(token, stream, protocol).has_value(); }
+std::optional<std::string> Security::grantId(const std::string &token, const std::string &stream, const std::string &protocol) const
 {
     std::lock_guard<std::mutex> lock(mutex);
     for (const auto &item : grants)
         if (item.second.stream == stream && item.second.protocol == protocol && item.second.expires > Time::now() &&
-            alive(item.second.owner) && tokenEqual(token, item.second.token)) return true;
-    return false;
+            alive(item.second.owner) && tokenEqual(token, item.second.token)) return item.first;
+    return {};
+}
+bool Security::validateGrant(const std::string &id, const std::string &stream, const std::string &protocol) const
+{
+    std::lock_guard<std::mutex> lock(mutex); const auto item = grants.find(id);
+    return item != grants.end() && item->second.stream == stream && item->second.protocol == protocol &&
+        item->second.expires > Time::now() && alive(item->second.owner);
 }
 void Security::expire() { std::lock_guard<std::mutex> lock(mutex); cleanup(); }
 void Security::clear()

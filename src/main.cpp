@@ -20,22 +20,28 @@
 #include"camera/rgb_camera_ctl.h"
 #include"camera/thermal_camera_ctl.h"
 #endif
+#if defined(UAV_HAS_MEDIA_SERVICE)
+#include"media/ascend_media_device.h"
+#if defined(UAV_HAS_GATEWAY)
+#include"webrtc/video_service.h"
+#endif
+#endif
 
 // ===========================================================================
 // UAV_detection 主程序
 //
 // 当前阶段：同时测试可见光和热成像出图。
-//   世辉相机 ─MIPI─▶ MIPI RX ─▶ VI ─▶ VPSS ─┬─ chn0 2688x1520（主）
+//   世辉相机 ─MIPI─▶ MIPI RX ─▶ VI ─▶ VPSS ─┬─ chn0 2566x1520（主）
 //                                            └─ chn1 1920x1080（子）
 //   艾睿热成像 ─MIPI─▶ MIPI RX ─▶ VI ─▶ VPSS ── chn0 640x512
-// 设置 UAV_GATEWAY_TOKEN 时启用 HTTP/WS 状态与控制接口（见 docs/gateway.md）。
-// 编码（VENC）、RTSP/GB28181 推流都还没接。
+// config/gateway.json 配置接入凭据后启用 HTTP/WS 状态与控制接口（见 docs/gateway.md）。
+// --encode 同时发布主通道、子通道与热成像；Gateway 启用时 /webrtc 可观看三路视频。
 //
 // 运行（板卡上）：
 //   source /usr/local/Ascend/ascend-toolkit/set_env.sh
 //   ./bin/uav_detection --duration 15    # 采集 15 秒；不带参数则 Ctrl+C 结束
 // 抓到的第一帧会写到当前目录，直接能看：
-//   ffplay -f rawvideo -pixel_format nv21 -video_size 2688x1520 main_2688x1520.yuv
+//   ffplay -f rawvideo -pixel_format nv21 -video_size 2566x1520 main_2566x1520.yuv
 //   ffplay -f rawvideo -pixel_format nv21 -video_size 1920x1080 sub_1920x1080.yuv
 //   ffplay -f rawvideo -pixel_format nv21 -video_size 640x512 thermal_640x512.yuv
 //
@@ -219,8 +225,13 @@ int main(int argc, char **argv)
 #if defined(UAV_HAS_GATEWAY)
     if (argc > 1 && std::string(argv[1]) == "--gateway-only")
         return uav::gateway::runStandalone(argc - 1, argv + 1);
+    std::string gatewaySettings;
+    std::optional<uav::gateway::Config> gatewayConfig;
 #endif
     int durationSeconds = 0;
+#if defined(UAV_HAS_MEDIA_SERVICE)
+    bool enableEncoding = false; unsigned short rtspPort = 8554;
+#endif
     for (int i = 1; i < argc; ++i)
     {
         const std::string argument(argv[i]);
@@ -228,12 +239,35 @@ int main(int argc, char **argv)
         {
             std::cout << "Usage: uav_detection [--duration SECONDS]\n"
                          "  Capture RGB main/sub and thermal; 0 seconds (default) runs until Ctrl+C.\n"
-                         "  Save first NV21 frames: main_2688x1520.yuv, sub_1920x1080.yuv, thermal_640x512.yuv.\n"
-                         "  uav_detection --gateway-only [--bind ADDRESS] [--port PORT] [--config FILE]\n"
+                         "  Save first NV21 frames: main_2566x1520.yuv, sub_1920x1080.yuv, thermal_640x512.yuv.\n"
+                         "  --gateway-config FILE selects Gateway startup settings (default config/gateway.json).\n"
+                         "  uav_detection --gateway-only [--gateway-config FILE] [--bind ADDRESS] [--port PORT] [--config FILE]\n"
                          "  Gateway options: --state-file FILE --web-root DIRECTORY --tls-cert FILE --tls-key FILE\n"
-                         "Set UAV_GATEWAY_TOKEN to enable Gateway alongside board camera capture.\n";
+                         "Set admin_token in config/gateway.json to enable Gateway alongside board camera capture.\n";
+#if defined(UAV_HAS_MEDIA_SERVICE)
+            std::cout << "  --encode publishes RGB main/sub and thermal via RTSP and WebRTC.\n"
+                         "  --rtsp-port PORT selects RTSP listen port (default 8554), implies --encode.\n"
+                         "  With Gateway credentials configured, /webrtc serves three WebRTC video sources.\n";
+#endif
             return 0;
         }
+#if defined(UAV_HAS_GATEWAY)
+        if (argument == "--gateway-config" && i + 1 < argc)
+        {
+            gatewaySettings = argv[++i];
+            continue;
+        }
+#endif
+#if defined(UAV_HAS_MEDIA_SERVICE)
+        if (argument == "--encode") { enableEncoding = true; continue; }
+        if (argument == "--rtsp-port" && i + 1 < argc)
+        {
+            const std::string value(argv[++i]); unsigned port = 0;
+            const auto result = std::from_chars(value.data(), value.data() + value.size(), port);
+            if (result.ec == std::errc{} && result.ptr == value.data() + value.size() && port > 0 && port <= 65535)
+            { rtspPort = static_cast<unsigned short>(port); enableEncoding = true; continue; }
+        }
+#endif
         if (argument == "--duration" && i + 1 < argc)
         {
             const std::string value(argv[++i]);
@@ -251,11 +285,21 @@ int main(int argc, char **argv)
 
     UAV_LOG_INFO << "================ UAV_detection 启动 ================";
 
+#if defined(UAV_HAS_GATEWAY)
+    try { gatewayConfig = uav::gateway::loadConfig(gatewaySettings); }
+    catch (const std::exception &error)
+    { UAV_LOG_ERROR << "Gateway 配置读取失败，网页/API 入口不启动：" << error.what(); }
+#endif
+
 #if !defined(UAV_HAS_ASCEND)
     (void)durationSeconds;
 #if defined(UAV_HAS_GATEWAY)
-    if (const char *token = std::getenv("UAV_GATEWAY_TOKEN"); token && *token)
-        return uav::gateway::runStandalone(argc, argv);
+    if (gatewayConfig && !gatewayConfig->adminToken.empty())
+    {
+        char option[] = "--gateway-config";
+        char *gatewayArgs[]{argv[0], option, gatewaySettings.data()};
+        return uav::gateway::runStandalone(gatewaySettings.empty() ? 1 : 3, gatewayArgs);
+    }
 #endif
     // 本机 x86_64 调试（UAV_ASCEND=OFF）没有海思媒体环境，采集链路编不进来
     UAV_LOG_ERROR << "本次构建未启用昇腾（UAV_ASCEND=OFF），采集链路不可用；"
@@ -266,13 +310,15 @@ int main(int argc, char **argv)
     std::signal(SIGTERM, onSignal);
 
     // ---- 1. 公共媒体环境与两台相机 ---------------------------------------
-    MediaRuntime media;
-    if (!media.init()) return 1;
+    MediaRuntime mediaRuntime;
+    if (!mediaRuntime.init()) return 1;
     RGBCameraCtl ctl;
     ThermalCameraCtl thermal;
     RGBCameraCtl::Config cfg;   // 默认值即 8.11 __MIPI__ 那套：
                                 // 2688x1520@50 MIPI dev0 / vi pipe2 chn0 / vpss grp256 chn0+chn1
     ThermalCameraCtl::Config thermalCfg;
+    cfg.vpssChnCfg[0] = {true, 2566, 1520};
+    cfg.vpssChnCfg[1] = {true, 1920, 1080};
     const bool rgbReady = ctl.init(cfg);
     const bool thermalReady = thermal.init(thermalCfg);
     if (!rgbReady) UAV_LOG_ERROR << "可见光链路初始化失败，继续检查热成像";
@@ -284,14 +330,33 @@ int main(int argc, char **argv)
     UAV_LOG_INFO_F("热成像：链路=%s，串口 %s（%s）\n", thermalReady ? "就绪" : "失败",
                    thermalCfg.camera.port.c_str(), thermal.cameraConnected() ? "已连接，参数可调" : "未连接，只能抓图");
 
-    CaptureProbe rgbMain("可见光主通道", "main_2688x1520.yuv", cfg.width, cfg.height);
+#if defined(UAV_HAS_MEDIA_SERVICE)
+    // Exception unwinding joins capture before freeing the pipeline.
+    std::unique_ptr<media::AscendMediaDevice> video;
+#if defined(UAV_HAS_GATEWAY)
+    std::array<std::shared_ptr<webrtc::VideoService>, 3> webRtc;
+#endif
+#endif
+    CaptureProbe rgbMain("可见光主通道", "main_2566x1520.yuv", cfg.vpssChnCfg[0].width, cfg.vpssChnCfg[0].height);
     CaptureProbe rgbSub("可见光子通道", "sub_1920x1080.yuv",
                         cfg.vpssChnCfg[1].width ? cfg.vpssChnCfg[1].width : cfg.width,
                         cfg.vpssChnCfg[1].height ? cfg.vpssChnCfg[1].height : cfg.height);
     CaptureProbe thermalMain("热成像", "thermal_640x512.yuv", thermalCfg.width, thermalCfg.height);
+#if defined(UAV_HAS_MEDIA_SERVICE)
+    if (enableEncoding)
+    {
+        try
+        {
+            media::AscendMediaDevice::Config options; options.context = mediaRuntime.context(); options.rtspPort = rtspPort;
+            options.sources[0].enabled = options.sources[1].enabled = rgbReady; options.sources[2].enabled = thermalReady;
+            video = std::make_unique<media::AscendMediaDevice>(options); video->start();
+        }
+        catch (const std::exception& e) { UAV_LOG_ERROR << "编码链路启动失败：" << e.what(); return 1; }
+    }
+#endif
 
 #if defined(UAV_HAS_GATEWAY)
-    // 设置 Token 时启用网页接入。独立诊断采集仍可在未设置 Token 时运行。
+    // 从启动配置读取凭据；没有配置凭据时仍可运行独立诊断采集。
     std::unique_ptr<uav::gateway::Gateway> gateway;
     auto updateGatewayStatus = [&] {
         if (!gateway) return;
@@ -304,11 +369,11 @@ int main(int argc, char **argv)
             {"camera_control_connected", thermal.cameraConnected()}, {"frames", t.frames},
             {"errors", t.errors}, {"last_pts_us", t.lastPtsUs}});
     };
-    if (const char *token = std::getenv("UAV_GATEWAY_TOKEN"); token && *token)
+    if (gatewayConfig && !gatewayConfig->adminToken.empty())
     {
         try
         {
-            gateway = std::make_unique<uav::gateway::Gateway>(uav::gateway::configFromEnvironment());
+            gateway = std::make_unique<uav::gateway::Gateway>(std::move(*gatewayConfig));
             uav::gateway::Device rgb;
             rgb.id = "rgb";
             rgb.type = "camera";
@@ -341,7 +406,6 @@ int main(int argc, char **argv)
                         ok ? "command written to camera serial port" : "camera command could not be written",
                         {{"device_confirmed", false}}, uav::gateway::CommandCompletion::dispatched};
                 });
-            gateway->registerStream({"rgb.main", "rgb", "h264", {"webrtc", "rtsp", "gb28181"}}, {});
             uav::gateway::Device thermalDevice;
             thermalDevice.id = "thermal";
             thermalDevice.type = "camera";
@@ -349,30 +413,95 @@ int main(int argc, char **argv)
             thermalDevice.config = {{"serial_port", thermalCfg.camera.port},
                 {"width", thermalCfg.width}, {"height", thermalCfg.height}};
             gateway->registerDevice(std::move(thermalDevice));
+#if defined(UAV_HAS_MEDIA_SERVICE)
+            for (std::size_t i = 0; i < webRtc.size(); ++i)
+            {
+                const auto source = video ? video->source(i) : media::AscendMediaDevice::Config{}.sources[i];
+                if (video && source.enabled)
+                {
+                    webrtc::VideoService::Config live;
+                    live.encoder = media::MediaService::Config::forVideo(source.width, source.height, source.fps).encoders[1];
+                    webRtc[i] = std::make_shared<webrtc::VideoService>(video->service(i), live); webRtc[i]->start();
+                }
+                gateway->registerStream({source.id, source.deviceId, "h264", {"webrtc", "rtsp"}},
+                    [service = webRtc[i], source](const std::string& protocol) -> std::optional<uav::gateway::PlaybackEndpoint> {
+                        if (service && protocol == "webrtc")
+                        {
+                            const auto fs = ((source.width + 15) / 16) * ((source.height + 15) / 16);
+                            return uav::gateway::PlaybackEndpoint{"/api/v1/webrtc/" + source.id, true,
+                                {{"width", source.width}, {"height", source.height}, {"fps", source.fps}, {"max_fs", fs}, {"max_mbps", fs * source.fps}, {"signaling", "complete-sdp"}}};
+                        }
+                        return {};
+                    });
+                if (webRtc[i]) gateway->registerWebRtc(source.id, [service = webRtc[i]](auto request, auto done) {
+                    auto complete = [done = std::move(done)](webrtc::VideoService::Reply result) mutable {
+                        done({result.status, std::move(result.sessionId), std::move(result.sdp), std::move(result.error)});
+                    };
+                    if (request.sessionId.empty()) service->offer(std::move(request.sdp), std::move(request.credential), std::move(request.authorized), std::move(complete));
+                    else service->close(std::move(request.sessionId), std::move(request.credential), std::move(complete));
+                });
+            }
+#else
+            gateway->registerStream({"rgb.main", "rgb", "h264", {"webrtc", "rtsp"}}, {});
+#endif
             if (const char *file = std::getenv("UAV_GATEWAY_CONFIG")) uav::gateway::loadRegistry(*gateway, file);
             updateGatewayStatus();
             gateway->start();
             UAV_LOG_INFO_F("Gateway 已启动，端口 %u\n", static_cast<unsigned>(gateway->port()));
+#if defined(UAV_HAS_MEDIA_SERVICE)
+            if (webRtc[0] || webRtc[2]) UAV_LOG_INFO << "WebRTC viewer: /webrtc (Gateway port " << gateway->port() << ')';
+#endif
         }
         catch (const std::exception &error)
         {
             UAV_LOG_ERROR << "Gateway 启动失败，仅关闭网页/API 入口，采集继续：" << error.what();
             gateway.reset();
+#if defined(UAV_HAS_MEDIA_SERVICE)
+            for (auto& service : webRtc) if (service) { service->stop(); service.reset(); }
+#endif
         }
     }
 #endif
 
     // ---- 2. 独立采集线程，每路首次出图时保存样帧 -------------------------
+#if defined(UAV_HAS_MEDIA_SERVICE)
+#if defined(UAV_HAS_GATEWAY)
+    if (enableEncoding && !webRtc[0] && !webRtc[2]) UAV_LOG_INFO << "WebRTC 未启动；在 config/gateway.json 配置 admin_token 后启用 /webrtc 入口";
+#else
+    if (enableEncoding) UAV_LOG_INFO << "WebRTC 网页入口未构建；启用 UAV_GATEWAY 后可接入实时视频";
+#endif
+#endif
     try
     {
         if (rgbReady)
         {
-            rgbMain.start(media.context(), [&ctl](auto handler, int timeout) { return ctl.getFrame(0, std::move(handler), timeout); });
+            rgbMain.start(mediaRuntime.context(), [&](auto handler, int timeout) {
+                return ctl.getFrame(0, [&](const hi_video_frame_info& frame) {
+                    handler(frame);
+#if defined(UAV_HAS_MEDIA_SERVICE)
+                    if (video) video->submitBorrowed(0, frame);
+#endif
+                }, timeout);
+            });
             if (cfg.vpssChnCfg[1].enable)
-                rgbSub.start(media.context(), [&ctl](auto handler, int timeout) { return ctl.getFrame(1, std::move(handler), timeout); });
+                rgbSub.start(mediaRuntime.context(), [&](auto handler, int timeout) {
+                    return ctl.getFrame(1, [&](const hi_video_frame_info& frame) {
+                        handler(frame);
+#if defined(UAV_HAS_MEDIA_SERVICE)
+                        if (video) video->submitBorrowed(1, frame);
+#endif
+                    }, timeout);
+                });
         }
         if (thermalReady)
-            thermalMain.start(media.context(), [&thermal](auto handler, int timeout) { return thermal.getFrame(std::move(handler), timeout); });
+            thermalMain.start(mediaRuntime.context(), [&](auto handler, int timeout) {
+                return thermal.getFrame([&](const hi_video_frame_info& frame) {
+                    handler(frame);
+#if defined(UAV_HAS_MEDIA_SERVICE)
+                    if (video) video->submitBorrowed(2, frame);
+#endif
+                }, timeout);
+            });
     }
     catch (const std::exception& error)
     {
@@ -414,6 +543,12 @@ int main(int argc, char **argv)
     rgbMain.join();
     rgbSub.join();
     thermalMain.join();
+#if defined(UAV_HAS_MEDIA_SERVICE)
+#if defined(UAV_HAS_GATEWAY)
+    for (auto& service : webRtc) if (service) service->stop();
+#endif
+    if (video) video->stop(); // Return every VENC input lease before VPSS and the ACL context are destroyed.
+#endif
     const bool rgbPassed = rgbReady && rgbMain.passed() && (!cfg.vpssChnCfg[1].enable || rgbSub.passed());
     const bool thermalPassed = thermalReady && thermalMain.passed();
     UAV_LOG_INFO_F("出图测试结果：可见光=%s（主 %llu 帧，子 %llu 帧），热成像=%s（%llu 帧）",

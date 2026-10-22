@@ -28,11 +28,11 @@ def test_environment(**options):
     return env
 
 
-def launch(command, env=None):
+def launch(command, env=None, cwd=None):
     if env is None:
         env = test_environment(UAV_GATEWAY_STATE="")
     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                               text=True, env=env)
+                               text=True, env=env, cwd=cwd)
     if not select.select([process.stdout], [], [], 10)[0]:
         process.kill()
         raise AssertionError("gateway did not become ready")
@@ -410,6 +410,76 @@ class StandaloneIntegration(unittest.TestCase):
         return test_environment(UAV_GATEWAY_TOKEN=ADMIN, UAV_GATEWAY_VIEW_TOKEN=VIEWER,
                                 UAV_GATEWAY_STATE=str(Path(directory) / "state.json"), **options)
 
+    def test_startup_configuration_without_environment_credentials(self):
+        with tempfile.TemporaryDirectory() as directory:
+            settings = Path(directory) / "config" / "gateway.json"
+            settings.parent.mkdir()
+            settings.write_text(json.dumps({"admin_token": ADMIN, "viewer_token": VIEWER,
+                                           "bind_address": "0.0.0.0", "port": 0}))
+            # No --gateway-config, --bind, --port, or authentication environment variables.
+            process, port = launch([STANDALONE], test_environment(UAV_GATEWAY_STATE=""), cwd=directory)
+            try:
+                self.assertEqual(request(port, "GET", "/api/v1/status")[0], 200)
+                status, login = request(port, "POST", "/api/v1/auth/login", {"token": VIEWER}, token=None)
+                self.assertEqual(status, 201)
+                self.assertEqual(login["data"]["role"], "viewer")
+                self.assertEqual(request(port, "GET", "/api/v1/status", token="wrong")[0], 401)
+                self.assertNotIn(ADMIN, json.dumps(request(port, "GET", "/api/v1/status")[1]))
+            finally:
+                stop(process)
+
+    def test_explicit_startup_file_and_override_precedence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            settings = Path(directory) / "settings.json"
+            settings.write_text(json.dumps({"admin_token": "file-admin", "viewer_token": "file-viewer",
+                                           "bind_address": "192.0.2.254", "port": 8080}))
+            env = self.environment(directory, UAV_GATEWAY_BIND="127.0.0.1", UAV_GATEWAY_PORT="0")
+            process, port = launch([STANDALONE, "--gateway-config", str(settings)], env)
+            try:
+                self.assertEqual(request(port, "GET", "/api/v1/status")[0], 200)
+                self.assertEqual(request(port, "GET", "/api/v1/status", token="file-admin")[0], 401)
+            finally:
+                stop(process)
+            env.update(UAV_GATEWAY_BIND="192.0.2.254", UAV_GATEWAY_PORT="1")
+            process, port = launch([STANDALONE, "--gateway-config", str(settings),
+                                    "--bind", "127.0.0.1", "--port", "0"], env)
+            try:
+                self.assertGreater(port, 1024)
+                self.assertEqual(request(port, "GET", "/api/v1/status")[0], 200)
+            finally:
+                stop(process)
+
+    def test_startup_configuration_errors_do_not_expose_credentials(self):
+        with tempfile.TemporaryDirectory() as directory:
+            settings = Path(directory) / "gateway.json"
+            secret = "configuration-fixture-secret"
+            env = test_environment(UAV_GATEWAY_STATE="")
+            for invalid in ("{", "[]", json.dumps({"admin_token": 42}),
+                            json.dumps({"admin_token": secret, "bind_address": False}),
+                            *(json.dumps({"admin_token": secret, "port": value}) for value in (-1, 65536, True, 8080.5, "8080")),
+                            json.dumps({"admin_token": secret, "unknown": True})):
+                with self.subTest(configuration=invalid):
+                    settings.write_text(invalid)
+                    result = subprocess.run([STANDALONE, "--gateway-config", str(settings)],
+                                            env=env, capture_output=True, text=True, timeout=3)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertNotIn(secret, result.stdout + result.stderr)
+            settings.unlink()
+            result = subprocess.run([STANDALONE, "--gateway-config", str(settings)],
+                                    env=env, capture_output=True, text=True, timeout=3)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("cannot read", result.stderr)
+
+    def test_startup_credentials_cannot_be_served_as_static_assets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            settings = Path(directory) / "gateway.json"
+            settings.write_text(json.dumps({"admin_token": ADMIN, "port": 0}))
+            result = subprocess.run([STANDALONE, "--gateway-config", str(settings), "--web-root", directory],
+                                    env=test_environment(UAV_GATEWAY_STATE=""), capture_output=True, text=True, timeout=3)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("outside web root", result.stderr)
+            self.assertNotIn(ADMIN, result.stdout + result.stderr)
+
     def test_persistent_registry_preserves_runtime_adapters(self):
         with tempfile.TemporaryDirectory() as directory:
             env = self.environment(directory)
@@ -520,6 +590,10 @@ class StandaloneIntegration(unittest.TestCase):
                 self.assertEqual(raw("GET", "/", {"If-None-Match": "W/" + headers["ETag"]})[2], b"")
                 self.assertEqual(raw("GET", "/app.js?v=1")[0], 200)
                 self.assertEqual(raw("HEAD", "/app.js")[2], b"")
+                for path in ("/webrtc", "/webrtc/", "/webrtc?view=all"):
+                    self.assertEqual(raw("GET", path)[2], body)
+                    self.assertEqual(raw("HEAD", path)[0], 200)
+                    self.assertEqual(raw("HEAD", path)[2], b"")
                 self.assertEqual(raw("GET", "/settings", {"Accept": "text/html"})[2], body)
                 self.assertEqual(raw("GET", "/missing.js")[0], 404)
                 for path in ("/../secret.txt", "/%2e%2e/secret.txt", "/escape.txt", "/.env"):
@@ -618,7 +692,7 @@ class StandaloneIntegration(unittest.TestCase):
 
     def test_token_required_and_invalid_configuration(self):
         env = test_environment()
-        env.pop("UAV_GATEWAY_TOKEN", None)
+        env["UAV_GATEWAY_TOKEN"] = "" # Ignore an administrator's locally configured default token.
         result = subprocess.run([STANDALONE, "--port", "0"], env=env,
                                 capture_output=True, text=True, timeout=3)
         self.assertNotEqual(result.returncode, 0)

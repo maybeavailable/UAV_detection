@@ -30,6 +30,7 @@ struct Config
     std::chrono::seconds playbackLifetime{120};
     std::string stateFile; // 空值禁用持久化；独立程序默认 data/gateway-state.json
     std::string webRoot;   // 构建后的网页目录，可为空
+    std::string settingsFile; // 启动配置来源；不得放在网页根目录中
     std::string tlsCertificate;
     std::string tlsPrivateKey;
     std::string mediaServiceToken; // 可选：独立媒体进程调用授权校验 API 的凭据
@@ -79,6 +80,15 @@ using CommandHandler = std::function<CommandResult(const std::string &, const bo
 // 下层媒体服务仍须校验自己的会话授权；Gateway 的 Bearer Token 不会被放入媒体 URL。
 using StreamResolver = std::function<std::optional<PlaybackEndpoint>(const std::string &protocol)>;
 
+struct WebRtcRequest
+{
+    std::string sessionId, sdp, credential; // credential is a stable playback-grant binding, never a login token.
+    std::function<bool()> authorized; // Recheck during playback; expires/revocation close the media session.
+};
+struct WebRtcReply { unsigned status{500}; std::string sessionId, sdp, error; };
+// Nonblocking adapter. Complete once from any thread; never wait on Gateway's network thread.
+using WebRtcHandler = std::function<void(WebRtcRequest, std::function<void(WebRtcReply)>)>;
+
 class Gateway
 {
 public:
@@ -90,6 +100,7 @@ public:
     // 启动前登记硬件/媒体适配器。运行期间用 updateDeviceStatus/publish 更新数据。
     void registerDevice(Device device, std::vector<std::string> commands = {}, CommandHandler handler = {});
     void registerStream(Stream stream, StreamResolver resolver);
+    void registerWebRtc(const std::string &streamId, WebRtcHandler handler);
     void updateDeviceStatus(const std::string &id, boost::json::object status);
     // 有界异步投递：队列已满或尚未启动时返回 false。不能在此传递硬件帧指针。
     bool publish(std::string type, boost::json::value data);
@@ -108,7 +119,8 @@ private:
 
 // 启动文件只描述设备配置及流目录，不连接或模拟尚未实现的设备。
 void loadRegistry(Gateway &gateway, const std::string &path);
-Config configFromEnvironment();
+// 未指定路径时自动查找 config/gateway.json；已有环境变量覆盖文件中的对应设置。
+Config loadConfig(const std::string &path = {});
 int runStandalone(int argc, char **argv);
 
 } // namespace uav::gateway

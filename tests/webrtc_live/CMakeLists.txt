@@ -1,0 +1,31 @@
+cmake_minimum_required(VERSION 3.18)
+project(webrtc_live_tests LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+enable_testing()
+get_filename_component(UAV_PROJECT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
+list(APPEND CMAKE_MODULE_PATH "${UAV_PROJECT_ROOT}/cmake")
+find_package(Threads REQUIRED)
+find_package(OpenSSL REQUIRED)
+find_package(SRTP REQUIRED)
+find_package(USRSCTP REQUIRED)
+add_subdirectory("${UAV_PROJECT_ROOT}/src/gateway" gateway)
+file(GLOB LIVE_GCC_SOURCES CONFIGURE_DEPENDS "${UAV_PROJECT_ROOT}/src/webrtc/congestion_control/*.cpp")
+add_library(webrtc_live_support STATIC ${LIVE_GCC_SOURCES})
+foreach(source IN ITEMS
+  common/udp_socket media/video_frame media/media_service media/h264_packetizer encode/encoder_session
+  webrtc/video_sender webrtc/video_service webrtc/peerconnection webrtc/ice_candidate webrtc/ice_agent
+  webrtc/ice_transport webrtc/sdp webrtc/stun_protocol webrtc/dtlstransport webrtc/datachannel
+  webrtc/srtp_session webrtc/srtp_ctl webrtc/srtcp_ctl webrtc/rtcp_protocol webrtc/rtcp_session
+  webrtc/transport_adapter log/log log/RotateFileWriter)
+  target_sources(webrtc_live_support PRIVATE "${UAV_PROJECT_ROOT}/src/${source}.cpp")
+endforeach()
+target_include_directories(webrtc_live_support PUBLIC "${UAV_PROJECT_ROOT}/src")
+target_include_directories(webrtc_live_support SYSTEM PUBLIC "${UAV_PROJECT_ROOT}/third_party/boost/include")
+target_link_libraries(webrtc_live_support PUBLIC uav_gateway_lib SRTP::SRTP USRSCTP::USRSCTP OpenSSL::SSL OpenSSL::Crypto Threads::Threads)
+target_compile_options(webrtc_live_support PRIVATE -Wall -Wextra -Wpedantic)
+add_executable(webrtc_live_test webrtc_live_test.cpp)
+target_link_libraries(webrtc_live_test PRIVATE webrtc_live_support)
+target_compile_options(webrtc_live_test PRIVATE -Wall -Wextra -Wpedantic)
+add_test(NAME webrtc_live COMMAND webrtc_live_test)
+set_tests_properties(webrtc_live PROPERTIES TIMEOUT 40 ENVIRONMENT "UAV_GATEWAY_WEB_ROOT=")

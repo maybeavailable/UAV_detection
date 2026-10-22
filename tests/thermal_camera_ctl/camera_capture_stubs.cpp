@@ -143,8 +143,9 @@ void RGBCameraCtl::deinit()
 bool RGBCameraCtl::getFrame(hi_vpss_chn chn, FrameHandler callback, int timeout)
 {
     require(rgbReady && (chn == 0 || chn == 1));
-    return grab(chn == 0 ? "rgb0" : "rgb1", chn == 0 ? m_cfg.width : m_cfg.vpssChnCfg[1].width,
-                chn == 0 ? m_cfg.height : m_cfg.vpssChnCfg[1].height, callback, timeout, chn == 0 ? 10 : 20);
+    const auto& output = m_cfg.vpssChnCfg[chn];
+    return grab(chn == 0 ? "rgb0" : "rgb1", output.width ? output.width : m_cfg.width,
+                output.height ? output.height : m_cfg.height, callback, timeout, chn == 0 ? 10 : 20);
 }
 
 ThermalCameraCtl::~ThermalCameraCtl() { deinit(); }

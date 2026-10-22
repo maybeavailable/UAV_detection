@@ -5,6 +5,7 @@
 #include <fstream>
 #include <iterator>
 #include <map>
+#include <vector>
 #include <stdexcept>
 #include <fcntl.h>
 #include <sys/file.h>
@@ -37,6 +38,25 @@ StateLock::StateLock(const std::string &path)
     }
 }
 StateLock::~StateLock() { if (fd >= 0) ::close(fd); }
+std::string findWebRoot()
+{
+    std::error_code error;
+    std::vector<fs::path> candidates;
+    const auto cwd = fs::current_path(error);
+    if (!error) candidates.push_back(cwd / "www" / "dist");
+    const auto executable = fs::read_symlink("/proc/self/exe", error);
+    if (!error)
+    {
+        const auto directory = executable.parent_path();
+        candidates.push_back(directory / "www");
+        candidates.push_back(directory / ".." / "www");
+        candidates.push_back(directory / ".." / "share" / "uav-gateway" / "www");
+    }
+    for (const auto& candidate : candidates)
+        if (fs::is_regular_file(candidate / "index.html", error))
+        { const auto resolved = fs::canonical(candidate, error); if (!error) return resolved.string(); }
+    return {};
+}
 boost::json::object readRegistryFile(const std::string &path)
 {
     boost::json::parse_options options;
